@@ -13,12 +13,6 @@ pub struct DormListRequest {
     pub size: i32,
 }
 
-impl DormListRequest {
-    pub fn new(current: i32, size: i32) -> Self {
-        Self { current, size }
-    }
-}
-
 impl Default for DormListRequest {
     fn default() -> Self {
         Self {
@@ -45,11 +39,13 @@ impl<'a> DormListService<'a> {
         current: i32,
         size: i32,
     ) -> Result<DormListData, AppError> {
-        let request = DormListRequest::new(current, size);
-        let headers = build_app_signed_headers(&self.client.full_url(DORM_LIST), token)
-            .map_err(|msg| ServiceError::BuildError {
-                service: "dorm.list",
-                msg,
+        let request = DormListRequest { current, size };
+        let headers =
+            build_app_signed_headers(&self.client.full_url(DORM_LIST), token).map_err(|msg| {
+                ServiceError::BuildError {
+                    service: "dorm.list",
+                    msg: msg.to_string(),
+                }
             })?;
         let response = self
             .client

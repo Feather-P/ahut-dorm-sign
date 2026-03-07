@@ -5,10 +5,12 @@ use crate::models::auth::AuthInfo;
 use crate::transport::{AppClient, HttpMethod};
 use crate::utils::hash::encode_md5;
 use crate::utils::headers::insert_header_str;
+use derive_builder::Builder;
 use reqwest::header::{AUTHORIZATION as HEADER_AUTHORIZATION, HeaderMap};
 
 /// 登录请求参数
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, Builder)]
+#[builder(default)]
 pub struct LoginRequest {
     /// 校区号
     pub tenant_id: String,
@@ -58,6 +60,15 @@ impl Default for LoginRequest {
     }
 }
 
+impl From<LoginRequestBuilderError> for ServiceError {
+    fn from(err: LoginRequestBuilderError) -> Self {
+        ServiceError::BuildError {
+            service: "login.login_request_builder",
+            msg: err.to_string(),
+        }
+    }
+}
+
 /// 登录服务
 pub struct LoginService<'a> {
     client: &'a AppClient,
@@ -69,7 +80,7 @@ impl<'a> LoginService<'a> {
         Self { client }
     }
 
-    /// 执行登录（暴露全部参数）
+    /// 执行登录
     pub async fn login(
         &self,
         tenant_id: &str,
@@ -79,26 +90,32 @@ impl<'a> LoginService<'a> {
         grant_type: &str,
         scope: &str,
     ) -> Result<AuthInfo, AppError> {
-        let request = LoginRequest::new(
-            tenant_id,
-            username,
-            encode_md5(password),
-            r#type,
-            grant_type,
-            scope,
-        );
+        let request = LoginRequestBuilder::default()
+            .tenant_id(tenant_id.to_string())
+            .username(username.to_string())
+            .password(encode_md5(password))
+            .r#type(r#type.to_string())
+            .grant_type(grant_type.to_string())
+            .scope(scope.to_string())
+            .build()
+            .map_err(ServiceError::from)?;
 
         let mut headers = HeaderMap::with_capacity(1);
-        insert_header_str(&mut headers, HEADER_AUTHORIZATION, auth::LOGIN_AUTHORIZATION)
-            .map_err(|e| ServiceError::InvalidRequest {
+        insert_header_str(
+            &mut headers,
+            HEADER_AUTHORIZATION,
+            auth::LOGIN_AUTHORIZATION,
+        )
+        .map_err(|e| ServiceError::InvalidRequest {
+            service: "login",
+            msg: e.to_string(),
+        })?;
+        insert_header_str(&mut headers, "Tenant-Id", &request.tenant_id).map_err(|e| {
+            ServiceError::InvalidRequest {
                 service: "login",
                 msg: e.to_string(),
-            })?;
-        insert_header_str(&mut headers, "Tenant-Id", &request.tenant_id)
-            .map_err(|e| ServiceError::InvalidRequest {
-                service: "login",
-                msg: e.to_string(),
-            })?;
+            }
+        })?;
 
         let response = self
             .client
@@ -108,7 +125,10 @@ impl<'a> LoginService<'a> {
             .send()
             .await?;
 
-        self.client.parse_json::<AuthInfo>(response).await.map_err(AppError::from)
+        self.client
+            .parse_json::<AuthInfo>(response)
+            .await
+            .map_err(AppError::from)
     }
 
     /// 使用默认参数执行登录（tenant_id/type/grant_type/scope 来自常量）

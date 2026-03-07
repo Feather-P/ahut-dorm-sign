@@ -1,9 +1,8 @@
 use crate::utils::hash::encode_md5;
 use crate::utils::headers::insert_header_str;
 use crate::{constants::auth::APP_AUTHORIZATION, utils::hash::encode_base64};
-use reqwest::header::{AUTHORIZATION as HEADER_AUTHORIZATION, HeaderMap};
 use reqwest::Url;
-
+use reqwest::header::{AUTHORIZATION as HEADER_AUTHORIZATION, HeaderMap, InvalidHeaderValue};
 use chrono::Utc;
 
 /// 生成 `FlySource-Auth` 请求头，格式为 `bearer {token}`
@@ -41,15 +40,20 @@ pub fn generate_flysource_sign(url: &str, token: &str) -> String {
 }
 
 /// 构造业务接口（含 FlySource 签名）请求头
-pub fn build_app_signed_headers(url: &str, token: &str) -> Result<HeaderMap, String> {
+pub fn build_app_signed_headers(url: &str, token: &str) -> Result<HeaderMap, InvalidHeaderValue> {
     let mut headers = HeaderMap::with_capacity(3);
 
-    insert_header_str(&mut headers, HEADER_AUTHORIZATION, APP_AUTHORIZATION)
-        .map_err(|e| e.to_string())?;
-    insert_header_str(&mut headers, "flysource-auth", &generate_flysource_auth(token))
-        .map_err(|e| e.to_string())?;
-    insert_header_str(&mut headers, "flysource-sign", &generate_flysource_sign(url, token))
-        .map_err(|e| e.to_string())?;
+    insert_header_str(&mut headers, HEADER_AUTHORIZATION, APP_AUTHORIZATION)?;
+    insert_header_str(
+        &mut headers,
+        "flysource-auth",
+        &generate_flysource_auth(token),
+    )?;
+    insert_header_str(
+        &mut headers,
+        "flysource-sign",
+        &generate_flysource_sign(url, token),
+    )?;
 
     Ok(headers)
 }

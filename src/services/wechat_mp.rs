@@ -41,7 +41,7 @@ impl<'a> WechatMpConfigService<'a> {
         let headers = build_app_signed_headers(&self.client.full_url(DORM_WECHAT_MP_CONFIG), token)
             .map_err(|msg| ServiceError::BuildError {
                 service: "wechat_check.headers_build",
-                msg,
+                msg: msg.to_string(),
             })?;
         let response = self
             .client
