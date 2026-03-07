@@ -1,5 +1,7 @@
 use crate::constants::client::{DEFAULT_TIMEOUT_SECS, DEFAULT_USER_AGENT};
 use crate::error::TransportError;
+use crate::utils::sign::build_app_signed_headers;
+use crate::utils::url::join_base_and_path;
 use reqwest::{Client, header::HeaderMap};
 use serde_json::Value;
 use std::time::Duration;
@@ -81,6 +83,7 @@ pub struct RequestBuilder<'a> {
     headers: Option<HeaderMap>,
     query: Option<Value>,
     json_body: Option<Value>,
+    token: Option<String>,
 }
 
 impl<'a> RequestBuilder<'a> {
@@ -91,23 +94,27 @@ impl<'a> RequestBuilder<'a> {
 
     pub fn query<T: serde::Serialize>(mut self, query: &T) -> Result<Self, TransportError> {
         self.query = Some(
-            serde_json::to_value(query)
-                .map_err(|e| TransportError::Serialize {
-                    field: "query",
-                    source: e,
-                })?,
+            serde_json::to_value(query).map_err(|e| TransportError::Serialize {
+                field: "query",
+                source: e,
+            })?,
         );
         Ok(self)
     }
 
+    pub fn sign(mut self, token: &str) -> Self {
+        self.token = Some(token.to_string());
+        self
+    }
+
     pub fn json<T: serde::Serialize>(mut self, body: &T) -> Result<Self, TransportError> {
-        self.json_body = Some(
-            serde_json::to_value(body)
-                .map_err(|e| TransportError::Serialize {
+        self.json_body =
+            Some(
+                serde_json::to_value(body).map_err(|e| TransportError::Serialize {
                     field: "json_body",
                     source: e,
                 })?,
-        );
+            );
         Ok(self)
     }
 
@@ -126,6 +133,17 @@ impl<'a> RequestBuilder<'a> {
 
         if let Some(headers) = self.headers {
             request = request.headers(headers);
+        }
+
+        // 存在token时的签名逻辑
+        match self.token {
+            Some(tok) => {
+                let signed_headers = build_app_signed_headers(&url, &tok).map_err(|e| {
+                    TransportError::ClientBuildError(format!("签名请求头构造失败: {}", e))
+                })?;
+                request = request.headers(signed_headers);
+            }
+            None => {}
         }
 
         if let Some(query) = self.query {
@@ -154,9 +172,7 @@ impl AppClient {
 
     /// 获取完整 URL
     pub fn full_url(&self, path: &str) -> String {
-        let base = self.base_url.trim_end_matches('/');
-        let path = path.trim_start_matches('/');
-        format!("{}/{}", base, path)
+        join_base_and_path(&self.base_url, path)
     }
 
     /// 统一请求构建入口
@@ -168,6 +184,7 @@ impl AppClient {
             headers: None,
             query: None,
             json_body: None,
+            token: None,
         }
     }
 

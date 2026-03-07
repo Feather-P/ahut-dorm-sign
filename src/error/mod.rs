@@ -1,7 +1,7 @@
 /// 传输层错误：仅表达 HTTP/序列化/反序列化/底层网络语义。
 #[derive(Debug, thiserror::Error)]
 pub enum TransportError {
-    #[error("网络库初始化错误: {0}")]
+    #[error("初始化错误: {0}")]
     ClientBuildError(String),
 
     #[error("网络请求错误: {0}")]

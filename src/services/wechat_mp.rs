@@ -1,6 +1,6 @@
 use crate::{
     AppClient, AppError, ServiceError, constants::endpoints::DORM_WECHAT_MP_CONFIG,
-    transport::HttpMethod, utils::sign::build_app_signed_headers,
+    transport::HttpMethod,
 };
 use derive_builder::Builder;
 use serde::Serialize;
@@ -38,15 +38,10 @@ impl<'a> WechatMpConfigService<'a> {
             .config_url(config_url.to_string())
             .build()
             .map_err(ServiceError::from)?;
-        let headers = build_app_signed_headers(&self.client.full_url(DORM_WECHAT_MP_CONFIG), token)
-            .map_err(|msg| ServiceError::BuildError {
-                service: "wechat_check.headers_build",
-                msg: msg.to_string(),
-            })?;
         let response = self
             .client
             .request(HttpMethod::Get, DORM_WECHAT_MP_CONFIG)
-            .header_map(headers)
+            .sign(token)
             .query(&request)?
             .send()
             .await?;
