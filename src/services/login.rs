@@ -12,7 +12,7 @@ use tracing::{debug, error, info, instrument};
 
 /// 登录请求参数
 #[derive(Debug, serde::Serialize, Builder)]
-#[builder(default)]
+#[builder(default, setter(into))]
 pub struct LoginRequest {
     /// 校区号
     pub tenant_id: String,
@@ -100,12 +100,12 @@ impl LoginService {
             "preparing login request"
         );
         let request = LoginRequestBuilder::default()
-            .tenant_id(tenant_id.to_string())
-            .username(username.to_string())
+            .tenant_id(tenant_id)
+            .username(username)
             .password(encode_md5(password))
-            .r#type(r#type.to_string())
-            .grant_type(grant_type.to_string())
-            .scope(scope.to_string())
+            .r#type(r#type)
+            .grant_type(grant_type)
+            .scope(scope)
             .build()
             .map_err(ServiceError::from)?;
 

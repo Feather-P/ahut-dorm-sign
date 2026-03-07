@@ -207,13 +207,8 @@ impl AppClient {
         &self,
         response: reqwest::Response,
     ) -> Result<T, TransportError> {
-        let text = response.text().await?;
-        debug!(
-            step = "transport.parse_json",
-            payload_len = text.len(),
-            "parsing json response"
-        );
-        let parsed = serde_json::from_str(&text).map_err(TransportError::from);
+        debug!(step = "transport.parse_json", "parsing json response");
+        let parsed = response.json::<T>().await.map_err(TransportError::from);
         if let Err(err) = &parsed {
             error!(
                 step = "transport.parse_json.error",
@@ -232,8 +227,7 @@ impl AppClient {
     ) -> Result<T, AppError> {
         debug!(
             step = "transport.parse_biz_json",
-            service,
-            "parsing business envelope"
+            service, "parsing business envelope"
         );
         let envelope = self.parse_json::<BizEnvelope<T>>(response).await?;
         Ok(envelope.into_data(service)?)
