@@ -62,7 +62,7 @@ impl WechatMpConfigService {
             .client
             .request(HttpMethod::Get, DORM_WECHAT_MP_CONFIG)
             .sign(token)
-            .query(&request)?
+            .query(&request)
             .send()
             .await?;
 

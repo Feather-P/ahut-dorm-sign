@@ -59,7 +59,7 @@ impl ApiLogService {
             .client
             .request(HttpMethod::Post, DORM_API_LOG_SAVE)
             .sign(token)
-            .query(&request)?
+            .query(&request)
             .send()
             .await?;
 

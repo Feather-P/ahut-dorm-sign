@@ -4,7 +4,6 @@ use crate::models::envelope::BizEnvelope;
 use crate::utils::sign::build_app_signed_headers;
 use crate::utils::url::join_base_and_path;
 use reqwest::{Client, header::HeaderMap};
-use serde_json::Value;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
 
@@ -14,7 +13,6 @@ pub struct AppClientBuilder {
     base_url: String,
     timeout: Duration,
     user_agent: String,
-    enable_logging: bool,
 }
 
 impl AppClientBuilder {
@@ -24,7 +22,6 @@ impl AppClientBuilder {
             base_url: base_url.into(),
             timeout: Duration::from_secs(DEFAULT_TIMEOUT_SECS),
             user_agent: DEFAULT_USER_AGENT.to_string(),
-            enable_logging: false,
         }
     }
 
@@ -37,12 +34,6 @@ impl AppClientBuilder {
     /// 设置用户代理
     pub fn with_user_agent(mut self, user_agent: impl Into<String>) -> Self {
         self.user_agent = user_agent.into();
-        self
-    }
-
-    /// 启用日志
-    pub fn with_logging(mut self, enable: bool) -> Self {
-        self.enable_logging = enable;
         self
     }
 
@@ -80,9 +71,8 @@ pub struct RequestBuilder<'a> {
     client: &'a AppClient,
     method: HttpMethod,
     path: String,
+    request: reqwest::RequestBuilder,
     headers: Option<HeaderMap>,
-    query: Option<Value>,
-    json_body: Option<Value>,
     token: Option<String>,
 }
 
@@ -92,14 +82,9 @@ impl<'a> RequestBuilder<'a> {
         self
     }
 
-    pub fn query<T: serde::Serialize>(mut self, query: &T) -> Result<Self, TransportError> {
-        self.query = Some(
-            serde_json::to_value(query).map_err(|e| TransportError::Serialize {
-                field: "query",
-                source: e,
-            })?,
-        );
-        Ok(self)
+    pub fn query<T: serde::Serialize + ?Sized>(mut self, query: &T) -> Self {
+        self.request = self.request.query(query);
+        self
     }
 
     pub fn sign(mut self, token: &str) -> Self {
@@ -107,15 +92,9 @@ impl<'a> RequestBuilder<'a> {
         self
     }
 
-    pub fn json<T: serde::Serialize>(mut self, body: &T) -> Result<Self, TransportError> {
-        self.json_body =
-            Some(
-                serde_json::to_value(body).map_err(|e| TransportError::Serialize {
-                    field: "json_body",
-                    source: e,
-                })?,
-            );
-        Ok(self)
+    pub fn json<T: serde::Serialize + ?Sized>(mut self, body: &T) -> Self {
+        self.request = self.request.json(body);
+        self
     }
 
     pub async fn send(self) -> Result<reqwest::Response, TransportError> {
@@ -128,16 +107,11 @@ impl<'a> RequestBuilder<'a> {
             step = "transport.send",
             method,
             path = %self.path,
-            has_query = self.query.is_some(),
-            has_json_body = self.json_body.is_some(),
             has_token = self.token.is_some(),
             "sending http request"
         );
 
-        let mut request = match self.method {
-            HttpMethod::Get => self.client.http.get(&url),
-            HttpMethod::Post => self.client.http.post(&url),
-        };
+        let mut request = self.request;
 
         if let Some(headers) = self.headers {
             request = request.headers(headers);
@@ -152,14 +126,6 @@ impl<'a> RequestBuilder<'a> {
                 request = request.headers(signed_headers);
             }
             None => {}
-        }
-
-        if let Some(query) = self.query {
-            request = request.query(&query);
-        }
-
-        if let Some(json_body) = self.json_body {
-            request = request.json(&json_body);
         }
 
         let response = request.send().await?;
@@ -192,13 +158,18 @@ impl AppClient {
 
     /// 统一请求构建入口
     pub fn request(&self, method: HttpMethod, path: &str) -> RequestBuilder<'_> {
+        let url = self.full_url(path);
+        let request = match method {
+            HttpMethod::Get => self.http.get(url),
+            HttpMethod::Post => self.http.post(url),
+        };
+
         RequestBuilder {
             client: self,
             method,
             path: path.to_string(),
+            request,
             headers: None,
-            query: None,
-            json_body: None,
             token: None,
         }
     }

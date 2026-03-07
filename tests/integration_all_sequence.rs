@@ -23,7 +23,6 @@ async fn it_login_then_test_dorm_features_in_sequence() {
 
     let client = Arc::new(
         AppClient::builder(BASE_URL)
-        .with_logging(true)
         .build()
         .expect("构建客户端失败"),
     );

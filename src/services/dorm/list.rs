@@ -56,7 +56,7 @@ impl DormListService {
             .client
             .request(HttpMethod::Get, DORM_LIST)
             .sign(token)
-            .query(&request)?
+            .query(&request)
             .send()
             .await?;
 

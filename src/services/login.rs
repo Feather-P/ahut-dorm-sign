@@ -109,7 +109,7 @@ impl LoginService {
             .build()
             .map_err(ServiceError::from)?;
 
-        let mut headers = HeaderMap::with_capacity(1);
+        let mut headers = HeaderMap::with_capacity(2);
         insert_header_str(
             &mut headers,
             HEADER_AUTHORIZATION,
@@ -137,7 +137,7 @@ impl LoginService {
             .client
             .request(HttpMethod::Post, LOGIN)
             .header_map(headers)
-            .query(&request)?
+            .query(&request)
             .send()
             .await?;
 

@@ -73,7 +73,7 @@ impl DormSignService {
             .client
             .request(HttpMethod::Post, DORM_ADD_RECORD)
             .sign(token)
-            .json(&request)?
+            .json(&request)
             .send()
             .await?;
 
