@@ -81,7 +81,7 @@ impl<'a> LoginService<'a> {
     }
 
     /// 执行登录
-    pub async fn login(
+    async fn login(
         &self,
         tenant_id: &str,
         username: &str,

@@ -1,5 +1,6 @@
 use crate::constants::client::{DEFAULT_TIMEOUT_SECS, DEFAULT_USER_AGENT};
-use crate::error::TransportError;
+use crate::error::{AppError, TransportError};
+use crate::models::envelope::BizEnvelope;
 use crate::utils::sign::build_app_signed_headers;
 use crate::utils::url::join_base_and_path;
 use reqwest::{Client, header::HeaderMap};
@@ -219,5 +220,15 @@ impl AppClient {
     ) -> Result<T, TransportError> {
         let text = response.text().await?;
         serde_json::from_str(&text).map_err(TransportError::from)
+    }
+
+    /// 解析并校验通用业务响应包裹，返回其中的 data。
+    pub async fn parse_biz_json<T: for<'de> serde::Deserialize<'de>>(
+        &self,
+        response: reqwest::Response,
+        service: &'static str,
+    ) -> Result<T, AppError> {
+        let envelope = self.parse_json::<BizEnvelope<T>>(response).await?;
+        Ok(envelope.into_data(service)?)
     }
 }

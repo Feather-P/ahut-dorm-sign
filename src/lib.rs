@@ -10,6 +10,7 @@ pub use constants::endpoints::BASE_URL;
 pub use error::{AppError, DomainError, ServiceError, TransportError};
 pub use models::auth::AuthInfo;
 pub use models::dorm::DormListData;
+pub use models::envelope::BizEnvelope;
 pub use transport::{AppClient, AppClientBuilder};
 pub use services::dorm::list::{DormListRequest, DormListService};
 pub use services::login::{LoginRequest, LoginService};

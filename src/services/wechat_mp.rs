@@ -46,28 +46,9 @@ impl<'a> WechatMpConfigService<'a> {
             .send()
             .await?;
 
-        let envelope = self
-            .client
-            .parse_json::<WechatMpEnvelopeResponse>(response)
-            .await?;
-
-        if !envelope.success || envelope.code != 200 {
-            return Err(ServiceError::RemoteBusiness {
-                service: "wechat_mp.wechat_check",
-                code: envelope.code,
-                msg: envelope.msg,
-            }
-            .into());
-        }
-
-        Ok(())
+        self.client
+            .parse_biz_json::<serde_json::Value>(response, "wechat_mp.wechat_check")
+            .await
+            .map(|_| ())
     }
-}
-
-/// 仅在服务层使用的网络响应包裹
-#[derive(Debug, serde::Deserialize)]
-struct WechatMpEnvelopeResponse {
-    code: i32,
-    success: bool,
-    msg: String,
 }
