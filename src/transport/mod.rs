@@ -6,6 +6,7 @@ use crate::utils::url::join_base_and_path;
 use reqwest::{Client, header::HeaderMap};
 use serde_json::Value;
 use std::time::Duration;
+use tracing::{debug, error, info, warn};
 
 /// App 客户端构建器
 #[derive(Debug, Clone)]
@@ -125,7 +126,15 @@ impl<'a> RequestBuilder<'a> {
             HttpMethod::Get => "GET",
             HttpMethod::Post => "POST",
         };
-        self.client.log_request(method, &url);
+        info!(
+            step = "transport.send",
+            method,
+            path = %self.path,
+            has_query = self.query.is_some(),
+            has_json_body = self.json_body.is_some(),
+            has_token = self.token.is_some(),
+            "sending http request"
+        );
 
         let mut request = match self.method {
             HttpMethod::Get => self.client.http.get(&url),
@@ -156,6 +165,13 @@ impl<'a> RequestBuilder<'a> {
         }
 
         let response = request.send().await?;
+        debug!(
+            step = "transport.response.received",
+            method,
+            path = %self.path,
+            status = response.status().as_u16(),
+            "http response received"
+        );
         self.client.handle_response(response).await
     }
 }
@@ -196,20 +212,24 @@ impl AppClient {
     ) -> Result<reqwest::Response, TransportError> {
         let status = response.status();
         if status.is_success() {
+            debug!(
+                step = "transport.response.ok",
+                status = status.as_u16(),
+                "http status success"
+            );
             Ok(response)
         } else {
             let body = response.text().await.unwrap_or_default();
+            warn!(
+                step = "transport.response.error_status",
+                status = status.as_u16(),
+                body_len = body.len(),
+                "http status not success"
+            );
             Err(TransportError::HttpStatus {
                 status: status.as_u16(),
                 body,
             })
-        }
-    }
-
-    /// 日志记录请求
-    fn log_request(&self, method: &str, url: &str) {
-        if self.enable_logging {
-            eprintln!("[HTTP] {} {}", method, url);
         }
     }
 
@@ -219,7 +239,20 @@ impl AppClient {
         response: reqwest::Response,
     ) -> Result<T, TransportError> {
         let text = response.text().await?;
-        serde_json::from_str(&text).map_err(TransportError::from)
+        debug!(
+            step = "transport.parse_json",
+            payload_len = text.len(),
+            "parsing json response"
+        );
+        let parsed = serde_json::from_str(&text).map_err(TransportError::from);
+        if let Err(err) = &parsed {
+            error!(
+                step = "transport.parse_json.error",
+                err = %err,
+                "json parse failed"
+            );
+        }
+        parsed
     }
 
     /// 解析并校验通用业务响应包裹，返回其中的 data。
@@ -228,6 +261,11 @@ impl AppClient {
         response: reqwest::Response,
         service: &'static str,
     ) -> Result<T, AppError> {
+        debug!(
+            step = "transport.parse_biz_json",
+            service,
+            "parsing business envelope"
+        );
         let envelope = self.parse_json::<BizEnvelope<T>>(response).await?;
         Ok(envelope.into_data(service)?)
     }

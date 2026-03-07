@@ -1,6 +1,7 @@
 mod constants;
 mod error;
 mod models;
+mod observability;
 mod transport;
 mod services;
 mod utils;
@@ -17,3 +18,4 @@ pub use services::dorm::list::{DormListRequest, DormListService};
 pub use services::dorm::wechat_mp::DormWechatMpService;
 pub use services::login::{LoginRequest, LoginService};
 pub use services::wechat_mp::WechatMpConfigService;
+pub use observability::init_tracing;

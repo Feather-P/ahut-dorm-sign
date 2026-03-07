@@ -1,5 +1,6 @@
 use ahut_dorm_sign::{
     AppClient, BASE_URL, DormApiLogService, DormListService, DormWechatMpService, LoginService,
+    init_tracing,
 };
 use std::sync::Arc;
 
@@ -14,6 +15,8 @@ fn read_env(name: &str) -> String {
 #[tokio::test]
 #[ignore = "需要真实账号与网络环境，默认跳过"]
 async fn it_login_then_test_dorm_features_in_sequence() {
+    init_tracing();
+
     let username = read_env("AHUT_USERNAME");
     let password = read_env("AHUT_PASSWORD");
 

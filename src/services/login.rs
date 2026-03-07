@@ -8,6 +8,7 @@ use crate::utils::headers::insert_header_str;
 use derive_builder::Builder;
 use reqwest::header::{AUTHORIZATION as HEADER_AUTHORIZATION, HeaderMap};
 use std::sync::Arc;
+use tracing::{debug, error, info, instrument};
 
 /// 登录请求参数
 #[derive(Debug, serde::Serialize, Builder)]
@@ -91,6 +92,13 @@ impl LoginService {
         grant_type: &str,
         scope: &str,
     ) -> Result<AuthInfo, AppError> {
+        info!(
+            step = "login.request.prepare",
+            endpoint = LOGIN,
+            tenant_id,
+            username,
+            "preparing login request"
+        );
         let request = LoginRequestBuilder::default()
             .tenant_id(tenant_id.to_string())
             .username(username.to_string())
@@ -118,6 +126,13 @@ impl LoginService {
             }
         })?;
 
+        debug!(
+            step = "login.request.send",
+            method = "POST",
+            path = LOGIN,
+            has_authorization = true,
+            "sending login request"
+        );
         let response = self
             .client
             .request(HttpMethod::Post, LOGIN)
@@ -126,13 +141,44 @@ impl LoginService {
             .send()
             .await?;
 
-        self.client
+        let status = response.status().as_u16();
+        debug!(
+            step = "login.response.received",
+            status,
+            path = LOGIN,
+            "login http response received"
+        );
+
+        let parsed = self
+            .client
             .parse_json::<AuthInfo>(response)
             .await
-            .map_err(AppError::from)
+            .map_err(AppError::from);
+
+        match &parsed {
+            Ok(_) => info!(
+                step = "login.result",
+                branch = "success",
+                username,
+                "login success"
+            ),
+            Err(err) => error!(
+                step = "login.result",
+                branch = "error",
+                err = %err,
+                "login failed"
+            ),
+        }
+
+        parsed
     }
 
     /// 使用默认参数执行登录（tenant_id/type/grant_type/scope 来自常量）
+    #[instrument(
+        name = "service.login_with_default",
+        skip(self, password),
+        fields(step = "login", username = username)
+    )]
     pub async fn login_with_default(
         &self,
         username: &str,
