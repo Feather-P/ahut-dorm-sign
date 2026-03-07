@@ -57,7 +57,6 @@ impl AppClientBuilder {
         Ok(AppClient {
             http,
             base_url: self.base_url,
-            enable_logging: self.enable_logging,
         })
     }
 }
@@ -67,7 +66,6 @@ impl AppClientBuilder {
 pub struct AppClient {
     pub(crate) http: Client,
     base_url: String,
-    enable_logging: bool,
 }
 
 /// App 的 http 请求方法

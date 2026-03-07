@@ -1,5 +1,5 @@
 use chrono::{Duration, NaiveDate};
-use crate::utils::serde_time::{date_from_datetime_without_tz, duration_seconds};
+use crate::utils::time::{date_from_datetime_without_tz, duration_seconds};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AuthInfo {

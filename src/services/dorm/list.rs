@@ -33,7 +33,7 @@ impl DormListService {
         Self { client }
     }
 
-    /// 获取宿舍签到任务列表（仅返回领域数据，不暴露网络响应包裹结构）
+    /// 获取宿舍签到任务列表
     #[instrument(
         name = "service.dorm_list",
         skip(self, token),

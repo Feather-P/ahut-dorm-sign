@@ -1,5 +1,5 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
-use crate::utils::serde_time::{
+use crate::utils::time::{
     datetime_utc_without_tz, naive_date, naive_time, opt_datetime_utc_without_tz, opt_naive_date,
     opt_naive_time,
 };

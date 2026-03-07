@@ -187,3 +187,17 @@ pub mod opt_naive_time {
         }
     }
 }
+
+pub mod chrono_to_str {
+    pub fn weekday_zh_cn(weekday: chrono::Weekday) -> &'static str {
+        match weekday {
+            chrono::Weekday::Mon => "星期一",
+            chrono::Weekday::Tue => "星期二",
+            chrono::Weekday::Wed => "星期三",
+            chrono::Weekday::Thu => "星期四",
+            chrono::Weekday::Fri => "星期五",
+            chrono::Weekday::Sat => "星期六",
+            chrono::Weekday::Sun => "星期日",
+        }
+    }
+}

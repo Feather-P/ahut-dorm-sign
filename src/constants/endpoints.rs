@@ -9,3 +9,5 @@ pub const DORM_LIST: &str = "/flySource-yxgl/dormSignTask/getListForApp";
 pub const DORM_WECHAT_MP_CONFIG: &str = "/flySource-base/wechat/getWechatMpConfig";
 /// 你工考勤系统页面访问日志记录路径
 pub const DORM_API_LOG_SAVE: &str = "/flySource-base/apiLog/save";
+/// 你工考勤系统添加签到记录路径
+pub const DORM_ADD_RECORD: &str = "/flySource-yxgl/dormSignRecord/add";

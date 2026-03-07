@@ -1,14 +1,15 @@
 use ahut_dorm_sign::{
-    AppClient, BASE_URL, DormApiLogService, DormListService, DormWechatMpService, LoginService,
-    init_tracing,
+    AppClient, BASE_URL, DormApiLogService, DormListService, DormSignService,
+    DormWechatMpService, LoginService, init_tracing, weekday_zh_cn,
 };
+use chrono::{Datelike, Local};
 use std::sync::Arc;
 
 fn read_env(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("缺少环境变量: {name}"))
 }
 
-/// 集成测试：登录 -> 获取 token -> 调用宿舍任务列表接口 -> 调用宿舍微信 mp 接口 -> 调用页面访问日志接口
+/// 集成测试：登录 -> 获取 token -> 调用宿舍任务列表接口 -> 调用宿舍签到接口 -> 调用宿舍微信 mp 接口 -> 调用页面访问日志接口
 ///
 /// 运行方式：
 /// AHUT_USERNAME=你的学号 AHUT_PASSWORD=你的密码 cargo test --test integration_all_sequence -- --ignored --nocapture
@@ -48,6 +49,16 @@ async fn it_login_then_test_dorm_features_in_sequence() {
         .expect("dorm list 为空，无法继续测试 dorm_wechat_mp/apilog 顺序调用");
 
     let wechat_service = DormWechatMpService::new(Arc::clone(&client));
+
+    let now = Local::now();
+    let sign_date = first_task
+        .sign_date
+        .unwrap_or_else(|| now.date_naive())
+        .format("%Y-%m-%d")
+        .to_string();
+    let sign_time = now.format("%H:%M:%S").to_string();
+    let sign_week = weekday_zh_cn(now.weekday()).to_string();
+
     wechat_service
         .dorm_wechat_mp_send(&first_task.task_id, &username, &token)
         .await
@@ -58,4 +69,18 @@ async fn it_login_then_test_dorm_features_in_sequence() {
         .dorm_api_log(&token)
         .await
         .expect("调用 dorm apilog 失败");
+
+    let sign_service = DormSignService::new(Arc::clone(&client));
+    sign_service
+        .sign(
+            &token,
+            &first_task.task_id,
+            31.69200,
+            118.51600,
+            &sign_date,
+            &sign_time,
+            &sign_week,
+        )
+        .await
+        .expect("调用 dorm sign 失败");
 }
