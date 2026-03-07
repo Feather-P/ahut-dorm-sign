@@ -7,6 +7,7 @@ use crate::utils::hash::encode_md5;
 use crate::utils::headers::insert_header_str;
 use derive_builder::Builder;
 use reqwest::header::{AUTHORIZATION as HEADER_AUTHORIZATION, HeaderMap};
+use std::sync::Arc;
 
 /// 登录请求参数
 #[derive(Debug, serde::Serialize, Builder)]
@@ -70,13 +71,13 @@ impl From<LoginRequestBuilderError> for ServiceError {
 }
 
 /// 登录服务
-pub struct LoginService<'a> {
-    client: &'a AppClient,
+pub struct LoginService {
+    client: Arc<AppClient>,
 }
 
-impl<'a> LoginService<'a> {
+impl LoginService {
     /// 创建新的登录服务
-    pub fn new(client: &'a AppClient) -> Self {
+    pub fn new(client: Arc<AppClient>) -> Self {
         Self { client }
     }
 

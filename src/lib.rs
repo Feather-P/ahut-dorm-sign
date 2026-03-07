@@ -12,6 +12,8 @@ pub use models::auth::AuthInfo;
 pub use models::dorm::DormListData;
 pub use models::envelope::BizEnvelope;
 pub use transport::{AppClient, AppClientBuilder};
+pub use services::dorm::apilog::DormApiLogService;
 pub use services::dorm::list::{DormListRequest, DormListService};
+pub use services::dorm::wechat_mp::DormWechatMpService;
 pub use services::login::{LoginRequest, LoginService};
 pub use services::wechat_mp::WechatMpConfigService;

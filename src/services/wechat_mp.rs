@@ -4,6 +4,7 @@ use crate::{
 };
 use derive_builder::Builder;
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, Builder)]
 pub struct WechatMpConfigRequest {
@@ -20,12 +21,12 @@ impl From<WechatMpConfigRequestBuilderError> for ServiceError {
     }
 }
 
-pub struct WechatMpConfigService<'a> {
-    client: &'a AppClient,
+pub struct WechatMpConfigService {
+    client: Arc<AppClient>,
 }
 
-impl<'a> WechatMpConfigService<'a> {
-    pub fn new(client: &'a AppClient) -> Self {
+impl WechatMpConfigService {
+    pub fn new(client: Arc<AppClient>) -> Self {
         Self { client }
     }
 

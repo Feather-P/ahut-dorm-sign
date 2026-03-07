@@ -3,6 +3,7 @@ use crate::constants::endpoints::DORM_LIST;
 use crate::error::AppError;
 use crate::models::dorm::DormListData;
 use crate::transport::{AppClient, HttpMethod};
+use std::sync::Arc;
 
 #[derive(Debug, serde::Serialize)]
 pub struct DormListRequest {
@@ -22,12 +23,12 @@ impl Default for DormListRequest {
 }
 
 /// 宿舍签到任务列表服务
-pub struct DormListService<'a> {
-    client: &'a AppClient,
+pub struct DormListService {
+    client: Arc<AppClient>,
 }
 
-impl<'a> DormListService<'a> {
-    pub fn new(client: &'a AppClient) -> Self {
+impl DormListService {
+    pub fn new(client: Arc<AppClient>) -> Self {
         Self { client }
     }
 
