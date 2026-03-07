@@ -2,7 +2,7 @@ use crate::constants::dorm;
 use crate::constants::endpoints::DORM_LIST;
 use crate::error::{AppError, ServiceError};
 use crate::models::dorm::DormListData;
-use crate::network::{AppClient, HttpMethod};
+use crate::transport::{AppClient, HttpMethod};
 use crate::utils::sign::build_app_signed_headers;
 
 #[derive(Debug, serde::Serialize)]
@@ -47,7 +47,7 @@ impl<'a> DormListService<'a> {
     ) -> Result<DormListData, AppError> {
         let request = DormListRequest::new(current, size);
         let headers = build_app_signed_headers(&self.client.full_url(DORM_LIST), token)
-            .map_err(|msg| ServiceError::InvalidRequest {
+            .map_err(|msg| ServiceError::BuildError {
                 service: "dorm.list",
                 msg,
             })?;

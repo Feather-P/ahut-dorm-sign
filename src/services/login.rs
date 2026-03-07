@@ -2,7 +2,7 @@ use crate::constants::auth;
 use crate::constants::endpoints::LOGIN;
 use crate::error::{AppError, ServiceError};
 use crate::models::auth::AuthInfo;
-use crate::network::{AppClient, HttpMethod};
+use crate::transport::{AppClient, HttpMethod};
 use crate::utils::hash::encode_md5;
 use crate::utils::headers::insert_header_str;
 use reqwest::header::{AUTHORIZATION as HEADER_AUTHORIZATION, HeaderMap};

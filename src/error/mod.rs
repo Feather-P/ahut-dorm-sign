@@ -24,6 +24,9 @@ pub enum TransportError {
 /// 服务层错误：表达服务编排/远端业务包裹校验语义。
 #[derive(Debug, thiserror::Error)]
 pub enum ServiceError {
+    #[error("服务[{service}]构建错误: {msg}")]
+    BuildError {service: &'static str, msg: String},
+
     #[error("服务[{service}]请求参数或构建错误: {msg}")]
     InvalidRequest { service: &'static str, msg: String },
 
