@@ -17,3 +17,8 @@ derive_builder = "0.20.2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 rand = "0.8"
+chrono-tz = "0.10.4"
+anyhow = "1.0.102"
+getset = "0.1.6"
+uuid = { version = "1.22.0", features = ["v4", "serde"] }
+geo-types = "0.7.18"

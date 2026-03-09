@@ -1,23 +1,3 @@
-mod constants;
-mod error;
-mod models;
-mod observability;
-mod transport;
-mod services;
-mod utils;
-
-pub use constants::auth::LOGIN_AUTHORIZATION;
-pub use constants::endpoints::BASE_URL;
-pub use error::{AppError, DomainError, ServiceError, TransportError};
-pub use models::auth::AuthInfo;
-pub use models::dorm::DormListData;
-pub use models::envelope::BizEnvelope;
-pub use transport::{AppClient, AppClientBuilder};
-pub use services::dorm::apilog::DormApiLogService;
-pub use services::dorm::list::{DormListRequest, DormListService};
-pub use services::dorm::sign::{DormSignRequest, DormSignService};
-pub use services::dorm::wechat_mp::DormWechatMpService;
-pub use services::login::{LoginRequest, LoginService};
-pub use services::wechat_mp::WechatMpConfigService;
-pub use observability::init_tracing;
-pub use utils::time::chrono_to_str::weekday_zh_cn;
+mod infrastructure;
+mod domain;
+mod application;
