@@ -15,6 +15,8 @@ pub trait SchoolGateway: Send + Sync {
 
     async fn refresh(&self, user: &SchoolUser) -> Result<SchoolToken, DomainError>;
 
+    /// 实现本函数应该注意：
+    /// 应该把学校的API返回的时间按Asia/Shanghai解析
     async fn fetch_active_task_list(&self, user: &SchoolUser) -> Result<Vec<SchoolSignTask>, DomainError>;
 
     /// 实现本函数的时候应该实现:

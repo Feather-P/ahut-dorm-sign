@@ -60,4 +60,16 @@ impl SchoolToken {
         }
         false
     }
+
+    pub fn access_token(&self) -> &str {
+        &self.access_token
+    }
+
+    pub fn refresh_token(&self) -> &str {
+        &self.refresh_token
+    }
+
+    pub fn expired_at(&self) -> &DateTime<Utc> {
+        &self.expired_at
+    }
 }

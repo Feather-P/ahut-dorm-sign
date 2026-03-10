@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::domain::{
@@ -19,6 +20,8 @@ pub struct SchoolSignConfig {
     pub jitter_radius_max_meters: f64,
     pub accuracy_min_meters: f64,
     pub accuracy_max_meters: f64,
+    pub allow_sign_timerange_start: DateTime<Utc>,
+    pub allow_sign_timerange_end: DateTime<Utc>,
     pub enable: bool,
 }
 
@@ -33,6 +36,8 @@ impl SchoolSignConfig {
         jitter_radius_max_meters: f64,
         accuracy_min_meters: f64,
         accuracy_max_meters: f64,
+        allow_sign_timerange_start: DateTime<Utc>,
+        allow_sign_timerange_end: DateTime<Utc>,
         enable: bool,
     ) -> Result<Self, DomainError> {
         if student_id.trim().is_empty() {
@@ -65,6 +70,9 @@ impl SchoolSignConfig {
         if accuracy_min_meters > accuracy_max_meters {
             return Err(DomainError::InvalidLocationAccuracy(accuracy_min_meters));
         }
+        if allow_sign_timerange_end < allow_sign_timerange_start {
+            return Err(DomainError::InvalidDateRange);
+        }
 
         Ok(Self {
             id,
@@ -76,8 +84,14 @@ impl SchoolSignConfig {
             jitter_radius_max_meters,
             accuracy_min_meters,
             accuracy_max_meters,
+            allow_sign_timerange_start,
+            allow_sign_timerange_end,
             enable,
         })
+    }
+
+    pub fn is_allowed_at(&self, utc_now: DateTime<Utc>) -> bool {
+        utc_now >= self.allow_sign_timerange_start && utc_now <= self.allow_sign_timerange_end
     }
 
     /// 由静态配置 + 运行时上下文，生成领域签到命令。
@@ -88,6 +102,9 @@ impl SchoolSignConfig {
     ) -> Result<CheckinCommand, DomainError> {
         if !self.enable {
             return Err(DomainError::SignConfigDisabled);
+        }
+        if !self.is_allowed_at(runtime.utc_now) {
+            return Err(DomainError::NotRunnableNow);
         }
 
         let sampled_accuracy =

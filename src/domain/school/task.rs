@@ -68,8 +68,32 @@ impl SchoolSignTask {
         true
     }
 
+    pub fn id(&self) -> &Uuid {
+        &self.id
+    }
+
+    pub fn student_id(&self) -> &str {
+        &self.student_id
+    }
+
     pub fn school_task_id(&self) -> &str {
         &self.school_task_id
+    }
+
+    pub fn date_range(&self) -> &DateRange {
+        &self.date_range
+    }
+
+    pub fn daily_time_window(&self) -> &TimeWindow {
+        &self.daily_time_window
+    }
+
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    pub fn days_of_week(&self) -> &WeekdaySet {
+        &self.days_of_week
     }
 
     pub fn time_zone(&self) -> &chrono_tz::Tz {

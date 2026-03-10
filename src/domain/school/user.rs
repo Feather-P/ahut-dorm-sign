@@ -72,6 +72,10 @@ impl SchoolUser {
         &self.user_name
     }
 
+    pub fn owner_user_id(&self) -> &Uuid {
+        &self.owner_user_id
+    }
+
     pub fn student_id(&self) -> &str {
         &self.student_id
     }
