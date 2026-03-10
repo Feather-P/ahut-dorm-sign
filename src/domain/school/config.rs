@@ -1,10 +1,10 @@
-use chrono::Datelike;
 use uuid::Uuid;
 
 use crate::domain::{
     error::DomainError,
     school::{
         location::GeoPoint,
+        noise::CheckinNoiseGenerator,
         task::{CheckinCommand, CheckinRuntime},
     },
 };
@@ -42,13 +42,19 @@ impl SchoolSignConfig {
             return Err(DomainError::BlankSchoolTaskId);
         }
         if !jitter_radius_min_meters.is_finite() || jitter_radius_min_meters < 0.0 {
-            return Err(DomainError::InvalidLocationAccuracy(jitter_radius_min_meters));
+            return Err(DomainError::InvalidLocationAccuracy(
+                jitter_radius_min_meters,
+            ));
         }
         if !jitter_radius_max_meters.is_finite() || jitter_radius_max_meters < 0.0 {
-            return Err(DomainError::InvalidLocationAccuracy(jitter_radius_max_meters));
+            return Err(DomainError::InvalidLocationAccuracy(
+                jitter_radius_max_meters,
+            ));
         }
         if jitter_radius_min_meters > jitter_radius_max_meters {
-            return Err(DomainError::InvalidLocationAccuracy(jitter_radius_min_meters));
+            return Err(DomainError::InvalidLocationAccuracy(
+                jitter_radius_min_meters,
+            ));
         }
         if !accuracy_min_meters.is_finite() || accuracy_min_meters <= 0.0 {
             return Err(DomainError::InvalidLocationAccuracy(accuracy_min_meters));
@@ -78,45 +84,25 @@ impl SchoolSignConfig {
     pub fn build_checkin_command(
         &self,
         runtime: &CheckinRuntime,
-        point: GeoPoint,
-        accuracy_meters: f64,
+        noise_generator: &dyn CheckinNoiseGenerator,
     ) -> Result<CheckinCommand, DomainError> {
         if !self.enable {
             return Err(DomainError::SignConfigDisabled);
         }
-        if !accuracy_meters.is_finite() || accuracy_meters <= 0.0 {
-            return Err(DomainError::InvalidLocationAccuracy(accuracy_meters));
-        }
-        if accuracy_meters < self.accuracy_min_meters || accuracy_meters > self.accuracy_max_meters {
-            return Err(DomainError::InvalidLocationAccuracy(accuracy_meters));
-        }
-        self.ensure_point_within_jitter(point)?;
 
-        let local = runtime.local_now;
-        Ok(CheckinCommand {
-            task_id: self.school_task_id.clone(),
-            point,
-            accuracy_meters,
-            date: local.date_naive(),
-            time: local.time(),
-            weekday: local.weekday(),
-        })
-    }
+        let sampled_accuracy =
+            noise_generator.sample_accuracy(self.accuracy_min_meters, self.accuracy_max_meters);
 
-    fn ensure_point_within_jitter(&self, point: GeoPoint) -> Result<(), DomainError> {
-        let base_lat = self.point.lat();
-        let base_lng = self.point.lng();
-        let target_lat = point.lat();
-        let target_lng = point.lng();
-
-        let delta_lat_m = (target_lat - base_lat) * 111_320.0;
-        let delta_lng_m = (target_lng - base_lng) * 111_320.0 * base_lat.to_radians().cos();
-        let distance_m = (delta_lat_m.powi(2) + delta_lng_m.powi(2)).sqrt();
-
-        if distance_m < self.jitter_radius_min_meters || distance_m > self.jitter_radius_max_meters {
-            return Err(DomainError::InvalidCoordinates(target_lng, target_lat));
-        }
-
-        Ok(())
+        let sampled_point = noise_generator.sample_point(
+            self.point,
+            self.jitter_radius_min_meters,
+            self.jitter_radius_max_meters,
+        );
+        CheckinCommand::new(
+            &self.school_task_id,
+            &sampled_point,
+            sampled_accuracy,
+            runtime.utc_now,
+        )
     }
 }

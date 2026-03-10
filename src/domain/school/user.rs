@@ -61,14 +61,11 @@ impl SchoolUser {
     }
 
     pub fn update_token(&mut self, token: SchoolToken) {
-        match self.token {
-            None => {
-                self.token = Some(token)
-            }
-            Some(_) => {
-                self.token = Some(token)
-            }
-        }
+        self.token = Some(token);
+    }
+
+    pub fn token(&self) -> &Option<SchoolToken> {
+        &self.token
     }
 
     pub fn user_name(&self) -> &str {

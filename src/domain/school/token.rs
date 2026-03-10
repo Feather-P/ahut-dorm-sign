@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 
 use crate::domain::error::DomainError;
 
@@ -49,6 +49,13 @@ impl SchoolToken {
 
     pub fn is_token_expired(&self, utc_now: DateTime<Utc>) -> bool {
         if utc_now >= self.expired_at {
+            return true;
+        }
+        false
+    }
+
+    pub fn need_refresh(&self, utc_now: DateTime<Utc>, refresh_skew: Duration) -> bool {
+        if utc_now + refresh_skew >= self.expired_at {
             return true;
         }
         false

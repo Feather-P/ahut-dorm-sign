@@ -1,6 +1,6 @@
 use crate::domain::school::location::GeoPoint;
 
-pub trait CheckinSamplingPort: Send + Sync {
+pub trait CheckinNoiseGenerator: Send + Sync {
     fn sample_point(
         &self,
         base: GeoPoint,

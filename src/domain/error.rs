@@ -16,7 +16,7 @@ pub enum ErrorKind {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum DomainError {
-    #[error("任务现在不可运行内")]
+    #[error("任务现在不可运行")]
     NotRunnableNow,
 
     #[error("无效的密码")]
@@ -51,6 +51,12 @@ pub enum DomainError {
 
     #[error("无效的定位精度: {0}")]
     InvalidLocationAccuracy(f64),
+
+    #[error("无效的token刷新提前量(秒): {0}")]
+    InvalidTokenRefreshSkewSeconds(i64),
+
+    #[error("无效的重试次数: {0}")]
+    InvalidRetryTimes(u32),
 
     #[error("签到配置已禁用")]
     SignConfigDisabled,
@@ -102,6 +108,8 @@ impl DomainError {
             | DomainError::BlankDaysOfWeek
             | DomainError::InvalidCoordinates(_, _)
             | DomainError::InvalidLocationAccuracy(_)
+            | DomainError::InvalidTokenRefreshSkewSeconds(_)
+            | DomainError::InvalidRetryTimes(_)
             | DomainError::SignConfigDisabled
             | DomainError::BlankToken
             | DomainError::PasswordMismatch
@@ -135,6 +143,8 @@ impl DomainError {
             | DomainError::BlankDaysOfWeek
             | DomainError::InvalidCoordinates(_, _)
             | DomainError::InvalidLocationAccuracy(_)
+            | DomainError::InvalidTokenRefreshSkewSeconds(_)
+            | DomainError::InvalidRetryTimes(_)
             | DomainError::SignConfigDisabled
             | DomainError::BlankToken
             | DomainError::PasswordMismatch
