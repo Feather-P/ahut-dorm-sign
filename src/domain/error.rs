@@ -67,6 +67,18 @@ pub enum DomainError {
     #[error("密码不正确")]
     PasswordMismatch,
 
+    #[error("凭据密文无效")]
+    InvalidCredentialEnvelope,
+
+    #[error("凭据算法无效")]
+    InvalidCredentialAlgorithm,
+
+    #[error("凭据解密失败")]
+    CredentialDecryptFailed,
+
+    #[error("不支持的凭据版本: {version}")]
+    UnsupportedCredentialVersion { version: u8 },
+
     #[error("未找到签到任务: {task_id}")]
     TaskNotFound { task_id: String },
 
@@ -113,6 +125,10 @@ impl DomainError {
             | DomainError::SignConfigDisabled
             | DomainError::BlankToken
             | DomainError::PasswordMismatch
+            | DomainError::InvalidCredentialEnvelope
+            | DomainError::InvalidCredentialAlgorithm
+            | DomainError::CredentialDecryptFailed
+            | DomainError::UnsupportedCredentialVersion { .. }
             | DomainError::TaskNotFound { .. } => ErrorKind::Terminal,
             DomainError::Unauthorized { .. } | DomainError::TokenExpired { .. } => {
                 ErrorKind::ReauthRequired
@@ -148,6 +164,10 @@ impl DomainError {
             | DomainError::SignConfigDisabled
             | DomainError::BlankToken
             | DomainError::PasswordMismatch
+            | DomainError::InvalidCredentialEnvelope
+            | DomainError::InvalidCredentialAlgorithm
+            | DomainError::CredentialDecryptFailed
+            | DomainError::UnsupportedCredentialVersion { .. }
             | DomainError::TaskNotFound { .. } => ErrorSource::Local,
             DomainError::Unauthorized { origin }
             | DomainError::TokenExpired { origin }

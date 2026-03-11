@@ -6,7 +6,7 @@ use crate::domain::{
     school::{
         location::GeoPoint,
         noise::CheckinNoiseGenerator,
-        task::{CheckinCommand, CheckinRuntime},
+        task::CheckinCommand,
     },
 };
 
@@ -97,13 +97,13 @@ impl SchoolSignConfig {
     /// 由静态配置 + 运行时上下文，生成领域签到命令。
     pub fn build_checkin_command(
         &self,
-        runtime: &CheckinRuntime,
+        utc_now: DateTime<Utc>,
         noise_generator: &dyn CheckinNoiseGenerator,
     ) -> Result<CheckinCommand, DomainError> {
         if !self.enable {
             return Err(DomainError::SignConfigDisabled);
         }
-        if !self.is_allowed_at(runtime.utc_now) {
+        if !self.is_allowed_at(utc_now) {
             return Err(DomainError::NotRunnableNow);
         }
 
@@ -119,7 +119,7 @@ impl SchoolSignConfig {
             &self.school_task_id,
             &sampled_point,
             sampled_accuracy,
-            runtime.utc_now,
+            utc_now,
         )
     }
 }

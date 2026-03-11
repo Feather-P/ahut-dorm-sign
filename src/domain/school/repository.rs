@@ -3,7 +3,10 @@ use chrono::{DateTime, Utc};
 
 use crate::domain::{
     error::DomainError,
-    school::{config::SchoolSignConfig, task::SchoolSignTask, user::SchoolUser},
+    school::{
+        session::SchoolSession, sign_config::SchoolSignConfig, task::SchoolSignTask,
+        user::SchoolUser,
+    },
 };
 
 type SchoolRepositoryResult<T> = Result<T, DomainError>;
@@ -89,5 +92,22 @@ pub trait SchoolSignTaskRepository: Send + Sync {
         &self,
         student_id: &str,
         school_task_id: &str,
+    ) -> SchoolRepositoryResult<bool>;
+}
+
+#[async_trait]
+pub trait SchoolSessionRepository: Send + Sync {
+    async fn find_by_owner_and_student(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
+    ) -> SchoolRepositoryResult<Option<SchoolSession>>;
+
+    async fn save(&self, session: SchoolSession) -> SchoolRepositoryResult<()>;
+
+    async fn delete_by_owner_and_student(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
     ) -> SchoolRepositoryResult<bool>;
 }

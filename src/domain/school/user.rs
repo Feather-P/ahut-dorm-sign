@@ -1,13 +1,14 @@
 use uuid::Uuid;
 
-use crate::domain::{error::DomainError };
-use crate::domain::school::crypto::{SchoolPasswordHasher};
+use crate::domain::error::DomainError;
+use crate::domain::school::credential::SchoolCredential;
+use crate::domain::school::crypto::{SchoolCredentialProtector, SchoolSidePasswdHasher};
 
 pub struct SchoolUser {
     student_id: String,
     owner_user_id: Uuid,
     user_name: String,
-    hashed_password: String,
+    credential: SchoolCredential,
 }
 
 impl SchoolUser {
@@ -15,7 +16,7 @@ impl SchoolUser {
         student_id: String,
         owner_user_id: Uuid,
         user_name: String,
-        hashed_password: String,
+        credential: SchoolCredential,
     ) -> Result<Self, DomainError> {
         if student_id.trim().is_empty() {
             return Err(DomainError::BlankSchoolUserId);
@@ -23,20 +24,26 @@ impl SchoolUser {
         if user_name.trim().is_empty() {
             return Err(DomainError::BlankUserName);
         }
-        if hashed_password.trim().is_empty() {
-            return Err(DomainError::BlankPassword);
-        }
         Ok(Self {
             student_id,
             owner_user_id,
             user_name,
-            hashed_password,
+            credential,
         })
     }
 
     /// 验证密码
-    pub fn verify_password(&self, plain_password: &str, hasher: &dyn SchoolPasswordHasher) -> bool {
-        hasher.verify(plain_password, &self.hashed_password)
+    pub fn verify_password(
+        &self,
+        plain_password: &str,
+        origin_hasher: &dyn SchoolSidePasswdHasher,
+        protector: &dyn SchoolCredentialProtector,
+    ) -> Result<bool, DomainError> {
+        let credential = origin_hasher.hash(plain_password);
+        if credential == protector.decrypt(&self.credential)? {
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     /// 修改密码
@@ -44,13 +51,15 @@ impl SchoolUser {
         &mut self,
         old_password: &str,
         new_password: String,
-        hasher: &dyn SchoolPasswordHasher,
+        origin_hasher: &dyn SchoolSidePasswdHasher,
+        protector: &dyn SchoolCredentialProtector,
     ) -> Result<(), DomainError> {
         if new_password.trim().is_empty() {
             return Err(DomainError::BlankPassword);
         }
-        if self.verify_password(old_password, hasher) {
-            self.hashed_password = hasher.hash(&new_password);
+        if self.verify_password(old_password, origin_hasher, protector)? {
+            let new_credential = origin_hasher.hash(&new_password);
+            self.credential = protector.encrypt(&new_credential);
             Ok(())
         } else {
             Err(DomainError::PasswordMismatch)

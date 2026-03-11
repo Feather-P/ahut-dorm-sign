@@ -200,14 +200,3 @@ impl CheckinCommand {
         self.occurred_at_utc
     }
 }
-
-/// 运行时上下文（由应用层注入时钟与任务解析结果）
-pub struct CheckinRuntime {
-    pub utc_now: DateTime<Utc>,
-}
-
-impl CheckinRuntime {
-    pub fn new(utc_now: DateTime<Utc>) -> Self {
-        Self { utc_now }
-    }
-}

@@ -1,11 +1,10 @@
-use chrono::{DateTime, Utc};
+use crate::domain::{error::DomainError, school::credential::SchoolCredential};
 
-pub trait SchoolPasswordHasher {
+pub trait SchoolSidePasswdHasher {
     fn hash(&self, plain_password: &str) -> String;
-    fn verify(&self, plain_password: &str, hashed_password_: &str) -> bool;
 }
 
-pub trait SchoolSignGenerator {
-    fn sign(&self, access_token: &str, url: &str, time_now: DateTime<Utc>) -> String;
-    fn auth(&self, access_token: &str) -> String;
+pub trait SchoolCredentialProtector {
+    fn encrypt(&self, school_origin_credential: &str) -> SchoolCredential;
+    fn decrypt(&self, school_credential: &SchoolCredential) -> Result<String, DomainError>;
 }
