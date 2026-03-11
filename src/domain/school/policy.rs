@@ -2,7 +2,7 @@ use chrono::{DateTime, Duration, Utc};
 
 use crate::domain::{
     error::{DomainError, ErrorKind},
-    school::token::SchoolToken,
+    school::{session::SchoolSession},
 };
 
 #[derive(Debug, Clone)]
@@ -107,18 +107,24 @@ impl SchoolAuthDecider {
         &self.config
     }
 
-    /// 基于当前 token 状态决定认证动作。
-    pub fn decide_by_token(&self, token: Option<&SchoolToken>, utc_now: DateTime<Utc>) -> AuthDecision {
-        match token {
-            None => AuthDecision::ReAuthenticate,
-            Some(token) => {
-                if token.need_refresh(
+    /// 基于session 的 token 状态决定认证动作。
+    pub fn decide_by_session(
+        &self,
+        session: Option<SchoolSession>,
+        utc_now: DateTime<Utc>,
+    ) -> AuthDecision {
+        match session {
+            None => {
+                return AuthDecision::ReAuthenticate
+            }
+            Some(session) => {
+                if session.need_refresh(
                     utc_now,
                     self.config.token_need_refresh_before_expired_duration(),
                 ) {
-                    AuthDecision::RefreshToken
+                    return AuthDecision::RefreshToken;
                 } else {
-                    AuthDecision::UseCurrentToken
+                    return AuthDecision::UseCurrentToken;
                 }
             }
         }

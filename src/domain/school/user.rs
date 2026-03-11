@@ -1,6 +1,5 @@
 use uuid::Uuid;
 
-use crate::domain::school::token::SchoolToken;
 use crate::domain::{error::DomainError };
 use crate::domain::school::crypto::{SchoolPasswordHasher};
 
@@ -9,7 +8,6 @@ pub struct SchoolUser {
     owner_user_id: Uuid,
     user_name: String,
     hashed_password: String,
-    token: Option<SchoolToken>
 }
 
 impl SchoolUser {
@@ -33,7 +31,6 @@ impl SchoolUser {
             owner_user_id,
             user_name,
             hashed_password,
-            token: None
         })
     }
 
@@ -58,14 +55,6 @@ impl SchoolUser {
         } else {
             Err(DomainError::PasswordMismatch)
         }
-    }
-
-    pub fn update_token(&mut self, token: SchoolToken) {
-        self.token = Some(token);
-    }
-
-    pub fn token(&self) -> &Option<SchoolToken> {
-        &self.token
     }
 
     pub fn user_name(&self) -> &str {
