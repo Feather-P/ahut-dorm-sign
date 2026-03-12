@@ -1,7 +1,7 @@
 use chrono::{Weekday, WeekdaySet};
 
 /// 将学校API的中文星期字符串转换为 Domain 层的集合
-fn parse_school_week(week_str: &str) -> WeekdaySet {
+pub fn parse_school_week(week_str: &str) -> WeekdaySet {
     let mut set = WeekdaySet::default();
     for part in week_str.split(',') {
         match part.trim() {
@@ -16,4 +16,16 @@ fn parse_school_week(week_str: &str) -> WeekdaySet {
         }
     }
     set
+}
+
+pub fn to_school_week(weekday: Weekday) -> &'static str {
+    match weekday {
+        Weekday::Mon => "星期一",
+        Weekday::Tue => "星期二",
+        Weekday::Wed => "星期三",
+        Weekday::Thu => "星期四",
+        Weekday::Fri => "星期五",
+        Weekday::Sat => "星期六",
+        Weekday::Sun => "星期日",
+    }
 }
