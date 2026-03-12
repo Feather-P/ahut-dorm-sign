@@ -103,6 +103,15 @@ pub enum DomainError {
         code: Option<i64>,
         message: String,
     },
+
+    #[error("持久化层不可用: {message}")]
+    PersistenceUnavailable { message: String },
+
+    #[error("持久化层并发冲突: {message}")]
+    PersistenceConflict { message: String },
+
+    #[error("持久化层数据损坏: {message}")]
+    PersistenceCorrupted { message: String },
 }
 
 impl DomainError {
@@ -142,6 +151,9 @@ impl DomainError {
                 Some(408) | Some(429) | Some(500..=599) => ErrorKind::Retryable,
                 _ => ErrorKind::Terminal,
             },
+            DomainError::PersistenceUnavailable { .. } => ErrorKind::Retryable,
+            DomainError::PersistenceConflict { .. } => ErrorKind::Retryable,
+            DomainError::PersistenceCorrupted { .. } => ErrorKind::Terminal,
         }
     }
 
@@ -175,6 +187,9 @@ impl DomainError {
             | DomainError::RemoteUnavailable { origin }
             | DomainError::AlreadySigned { origin }
             | DomainError::UpstreamRejected { origin, .. } => *origin,
+            DomainError::PersistenceUnavailable { .. }
+            | DomainError::PersistenceConflict { .. }
+            | DomainError::PersistenceCorrupted { .. } => ErrorSource::Local,
         }
     }
 }

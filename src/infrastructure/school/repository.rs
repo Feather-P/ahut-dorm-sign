@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc, WeekdaySet};
 use sqlx::{PgPool, Row};
 
 use crate::domain::{
-    error::{DomainError, ErrorSource},
+    error::DomainError,
     school::{
         credential::SchoolCredential,
         location::GeoPoint,
@@ -44,10 +44,41 @@ impl PgSchoolRepository {
 }
 
 fn map_sqlx_err(err: sqlx::Error) -> DomainError {
-    DomainError::UpstreamRejected {
-        origin: ErrorSource::Local,
-        code: None,
-        message: format!("postgres query failed: {err}"),
+    match err {
+        sqlx::Error::PoolTimedOut
+        | sqlx::Error::PoolClosed
+        | sqlx::Error::Io(_)
+        | sqlx::Error::Tls(_)
+        | sqlx::Error::WorkerCrashed => DomainError::PersistenceUnavailable {
+            message: format!("PostgreSQL 不可用: {err}"),
+        },
+        sqlx::Error::RowNotFound => DomainError::PersistenceCorrupted {
+            message: "在非预期上下文中未找到记录".to_string(),
+        },
+        sqlx::Error::Database(db_err) => {
+            if let Some(code) = db_err.code() {
+                match code.as_ref() {
+                    // serialization_failure / deadlock_detected / lock_not_available
+                    "40001" | "40P01" | "55P03" => DomainError::PersistenceConflict {
+                        message: format!("PostgreSQL 并发冲突({code}): {}", db_err.message()),
+                    },
+                    // unique_violation / exclusion_violation
+                    "23505" | "23P01" => DomainError::PersistenceConflict {
+                        message: format!("PostgreSQL 约束冲突({code}): {}", db_err.message()),
+                    },
+                    _ => DomainError::PersistenceCorrupted {
+                        message: format!("PostgreSQL 数据库错误({code}): {}", db_err.message()),
+                    },
+                }
+            } else {
+                DomainError::PersistenceCorrupted {
+                    message: format!("PostgreSQL 数据库错误: {}", db_err.message()),
+                }
+            }
+        }
+        other => DomainError::PersistenceCorrupted {
+            message: format!("PostgreSQL 未预期错误: {other}"),
+        },
     }
 }
 
@@ -528,4 +559,3 @@ impl SchoolSessionRepository for PgSchoolRepository {
         Ok(affected > 0)
     }
 }
-
