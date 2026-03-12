@@ -77,4 +77,12 @@ impl SchoolUser {
     pub fn student_id(&self) -> &str {
         &self.student_id
     }
+
+    /// 透传protector的decrypt方法，对用户密码进行解密，通过算法映射回学校原定的md5密码
+    pub fn decrypt_credential(
+        &self,
+        protector: &dyn SchoolCredentialProtector,
+    ) -> Result<String, DomainError> {
+        protector.decrypt(&self.credential)
+    }
 }

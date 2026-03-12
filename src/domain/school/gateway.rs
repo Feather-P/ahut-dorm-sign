@@ -10,7 +10,6 @@ pub trait SchoolGateway: Send + Sync {
     async fn authenticate(
         &self,
         user: &SchoolUser,
-        school_auth_secret: &str,
     ) -> Result<SchoolToken, DomainError>;
 
     async fn refresh(&self, session: &SchoolSession) -> Result<SchoolToken, DomainError>;
