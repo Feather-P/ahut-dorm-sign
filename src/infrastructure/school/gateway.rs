@@ -19,6 +19,13 @@ use crate::domain::{
 
 use super::week_mapper::{parse_school_week, to_school_week};
 
+/// 学校侧业务时间固定使用 Asia/Shanghai。
+///
+/// 约定：
+/// 1) 领域层/存储层统一传递 UTC（DateTime<Utc> / PostgreSQL timestamptz）。
+/// 2) 仅在和学校 API 交互时做时区转换。
+const SCHOOL_TIME_ZONE: chrono_tz::Tz = chrono_tz::Asia::Shanghai;
+
 pub struct AhutGateway {
     client: Client,
     base_url: Url,
@@ -146,8 +153,9 @@ impl SchoolGateway for AhutGateway {
         })?;
 
         let refresh_token = body.refresh_token.unwrap_or_else(|| access_token.clone());
-        let expires_in = body.expires_in.unwrap_or(7200);
-        let expired_at = Utc::now() + chrono::Duration::seconds(expires_in);
+        let expires_in = body.expires_in.unwrap_or(3600);
+        let now_utc = Utc::now();
+        let expired_at = now_utc + chrono::Duration::seconds(expires_in);
         SchoolToken::new(access_token, refresh_token, expired_at)
     }
 
@@ -181,7 +189,8 @@ impl SchoolGateway for AhutGateway {
         })?;
         let refresh_token = body.refresh_token.unwrap_or_else(|| access_token.clone());
         let expires_in = body.expires_in.unwrap_or(7200);
-        let expired_at = Utc::now() + chrono::Duration::seconds(expires_in);
+        let now_utc = Utc::now();
+        let expired_at = now_utc + chrono::Duration::seconds(expires_in);
         SchoolToken::new(access_token, refresh_token, expired_at)
     }
 
@@ -192,9 +201,10 @@ impl SchoolGateway for AhutGateway {
         let url = self.api_url(
             "flySource-yxgl/dormSignTask/getStudentTaskPage?userDataType=student&current=1&size=15",
         )?;
+        let now_utc = Utc::now();
         let flysource_sign = self
             .signer
-            .sign(session.access_token(), url.as_str(), Utc::now());
+            .sign(session.access_token(), url.as_str(), now_utc);
 
         let resp = self
             .client
@@ -246,7 +256,7 @@ impl SchoolGateway for AhutGateway {
                     DateRange::new(start_date, end_date)?,
                     TimeWindow::new(start_time, end_time)?,
                     parse_school_week(&it.sign_week),
-                    chrono_tz::Asia::Shanghai,
+                    SCHOOL_TIME_ZONE,
                 )
             })
             .collect::<Result<Vec<_>, DomainError>>()?;
@@ -331,10 +341,10 @@ impl SchoolGateway for AhutGateway {
         target: CheckinCommand,
     ) -> Result<(), DomainError> {
         let url = self.api_url("flySource-yxgl/dormSignRecord/add")?;
+        let now_utc = Utc::now();
         let local = target
             .occurred_at_utc()
-            // 这里直接写死时区是东八区了，我不觉得学校会换
-            .with_timezone(&chrono_tz::Asia::Shanghai);
+            .with_timezone(&SCHOOL_TIME_ZONE);
 
         let payload = serde_json::json!({
             "taskId": target.task_id(),
@@ -359,7 +369,7 @@ impl SchoolGateway for AhutGateway {
             .header(
                 "FlySource-sign",
                 self.signer
-                    .sign(session.access_token(), url.as_str(), Utc::now()),
+                    .sign(session.access_token(), url.as_str(), now_utc),
             )
             .json(&payload)
             .send()

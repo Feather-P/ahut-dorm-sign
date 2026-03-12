@@ -13,9 +13,10 @@ type SchoolRepositoryResult<T> = Result<T, DomainError>;
 
 #[async_trait]
 pub trait SchoolUserRepository: Send + Sync {
-    async fn find_by_student_id(
+    async fn find_by_owner_and_student(
         &self,
         student_id: &str,
+        owner_user_id: uuid::Uuid,
     ) -> SchoolRepositoryResult<Option<SchoolUser>>;
 
     async fn list_by_owner_user_id(
