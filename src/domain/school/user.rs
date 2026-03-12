@@ -78,6 +78,10 @@ impl SchoolUser {
         &self.student_id
     }
 
+    pub fn credential_storage(&self) -> String {
+        self.credential.to_storage()
+    }
+
     /// 透传protector的decrypt方法，对用户密码进行解密，通过算法映射回学校原定的md5密码
     pub fn decrypt_credential(
         &self,

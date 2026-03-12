@@ -41,6 +41,10 @@ impl SchoolSession {
         &self.token.refresh_token()
     }
 
+    pub fn expired_at(&self) -> DateTime<Utc> {
+        *self.token.expired_at()
+    }
+
     pub fn is_expired(&self, utc_now: DateTime<Utc>) -> bool {
         self.token.is_token_expired(utc_now)
     }
