@@ -23,8 +23,11 @@ impl AhutGatewayConfig {
     pub fn from_env() -> Result<Self> {
         let _ = dotenv();
 
+        let raw_base_url = required_env("AHUT_BASE_URL")?;
+        let base_url = normalize_base_url(&raw_base_url);
+
         Ok(Self {
-            base_url: required_env("AHUT_BASE_URL")?,
+            base_url,
             user_agent: env_or("HTTP_USER_AGENT", "ahut-dorm-sign/0.1"),
             connect_timeout: Duration::from_millis(env_parse_or("HTTP_CONNECT_TIMEOUT_MS", 3000u64)?),
             request_timeout: Duration::from_millis(env_parse_or("HTTP_REQUEST_TIMEOUT_MS", 10000u64)?),
@@ -98,3 +101,11 @@ where
     }
 }
 
+fn normalize_base_url(raw: &str) -> String {
+    let trimmed = raw.trim().trim_end_matches('/');
+    if trimmed.ends_with("/api") {
+        format!("{trimmed}/")
+    } else {
+        format!("{trimmed}/api/")
+    }
+}

@@ -120,16 +120,23 @@ impl SchoolCredentialProtector for AesGcmSchoolCredentialProtector {
 #[derive(Default)]
 pub struct FlySourceSigner;
 
+fn to_sign_path(url: &str) -> String {
+    if let Ok(parsed) = reqwest::Url::parse(url) {
+        return format!("{}?sign=", parsed.path());
+    }
+    let raw_path = url.split('?').next().unwrap_or(url);
+    format!("{raw_path}?sign=")
+}
+
 impl SchoolSignGenerator for FlySourceSigner {
     /// 生成学校请求头业务接口需要的Flysource-sign请求头
     fn sign(&self, access_token: &str, url: &str, time_now: DateTime<Utc>) -> String {
-        let ts = time_now.timestamp_millis();
-        let path = url.split('?').next().unwrap_or(url);
-        let first = format!("{ts}{access_token}");
+        let timestamp = time_now.timestamp_millis().to_string();
+        let first = format!("{timestamp}{access_token}");
         let first_hash = format!("{:x}", md5::compute(first));
-        let second = format!("{path}?sign={first_hash}");
+        let second = format!("{}{}", to_sign_path(url), first_hash);
         let second_hash = format!("{:x}", md5::compute(second));
-        let encoded_ts = STANDARD.encode(ts.to_string());
+        let encoded_ts = STANDARD.encode(timestamp.as_bytes());
         format!("{second_hash}1.{encoded_ts}")
     }
 
@@ -139,3 +146,53 @@ impl SchoolSignGenerator for FlySourceSigner {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn should_generate_flysource_auth() {
+        let signer = FlySourceSigner;
+        assert_eq!(signer.auth("token-123"), "bearer token-123");
+    }
+
+    #[test]
+    fn should_strip_query_when_building_sign() {
+        let signer = FlySourceSigner;
+        let now = Utc.timestamp_millis_opt(1_700_000_000_000).unwrap();
+        let sign = signer.sign(
+            "token-abc",
+            "https://example.com/api/auth/login?x=1&y=2",
+            now,
+        );
+
+        let hash1 = format!("{:x}", md5::compute("1700000000000token-abc"));
+        let hash2 = format!("{:x}", md5::compute(format!("/api/auth/login?sign={hash1}")));
+        let expect = format!("{}1.{}", hash2, STANDARD.encode("1700000000000"));
+
+        assert_eq!(sign, expect);
+    }
+
+    #[test]
+    fn should_fallback_when_url_parse_failed() {
+        let signer = FlySourceSigner;
+        let now = Utc.timestamp_millis_opt(1_700_000_000_000).unwrap();
+        let sign = signer.sign("token-abc", "/api/auth/login?x=1&y=2", now);
+
+        let hash1 = format!("{:x}", md5::compute("1700000000000token-abc"));
+        let hash2 = format!("{:x}", md5::compute(format!("/api/auth/login?sign={hash1}")));
+        let expect = format!("{}1.{}", hash2, STANDARD.encode("1700000000000"));
+
+        assert_eq!(sign, expect);
+    }
+
+    #[test]
+    fn should_build_sign_path_like_runtime_impl() {
+        assert_eq!(
+            to_sign_path("https://example.com/api/auth/login?x=1&y=2"),
+            "/api/auth/login?sign="
+        );
+        assert_eq!(to_sign_path("/api/auth/login?x=1&y=2"), "/api/auth/login?sign=");
+    }
+}

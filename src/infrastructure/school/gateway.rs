@@ -100,6 +100,15 @@ struct TaskItem {
     sign_week: String,
 }
 
+fn normalize_access_token(raw: String) -> String {
+    let trimmed = raw.trim();
+    if trimmed.len() >= 7 && trimmed[..7].eq_ignore_ascii_case("bearer ") {
+        trimmed[7..].trim().to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 #[async_trait]
 impl SchoolGateway for AhutGateway {
     async fn authenticate(&self, user: &SchoolUser) -> Result<SchoolToken, DomainError> {
@@ -117,7 +126,10 @@ impl SchoolGateway for AhutGateway {
                 ("grant_type", "password"),
                 ("scope", "all"),
             ])
-            .header(header::AUTHORIZATION, self.school_fixed_authorization.clone())
+            .header(
+                header::AUTHORIZATION,
+                self.school_fixed_authorization.clone(),
+            )
             .send()
             .await
             .map_err(|_| DomainError::RemoteUnavailable {
@@ -152,7 +164,11 @@ impl SchoolGateway for AhutGateway {
             }
         })?;
 
-        let refresh_token = body.refresh_token.unwrap_or_else(|| access_token.clone());
+        let access_token = normalize_access_token(access_token);
+        let refresh_token = body
+            .refresh_token
+            .map(normalize_access_token)
+            .unwrap_or_else(|| access_token.clone());
         let expires_in = body.expires_in.unwrap_or(3600);
         let now_utc = Utc::now();
         let expired_at = now_utc + chrono::Duration::seconds(expires_in);
@@ -170,7 +186,10 @@ impl SchoolGateway for AhutGateway {
                 ("scope", "all"),
                 ("refresh_token", session.refresh_token()),
             ])
-            .header(header::AUTHORIZATION, self.school_fixed_authorization.clone())
+            .header(
+                header::AUTHORIZATION,
+                self.school_fixed_authorization.clone(),
+            )
             .send()
             .await
             .map_err(|_| DomainError::RemoteUnavailable {
@@ -187,7 +206,11 @@ impl SchoolGateway for AhutGateway {
         let access_token = body.access_token.ok_or(DomainError::TokenExpired {
             origin: ErrorSource::School,
         })?;
-        let refresh_token = body.refresh_token.unwrap_or_else(|| access_token.clone());
+        let access_token = normalize_access_token(access_token);
+        let refresh_token = body
+            .refresh_token
+            .map(normalize_access_token)
+            .unwrap_or_else(|| access_token.clone());
         let expires_in = body.expires_in.unwrap_or(7200);
         let now_utc = Utc::now();
         let expired_at = now_utc + chrono::Duration::seconds(expires_in);
@@ -202,28 +225,30 @@ impl SchoolGateway for AhutGateway {
             "flySource-yxgl/dormSignTask/getStudentTaskPage?userDataType=student&current=1&size=15",
         )?;
         let now_utc = Utc::now();
-        let flysource_sign = self
-            .signer
-            .sign(session.access_token(), url.as_str(), now_utc);
+        // 学校业务接口签名与 flysource-auth 实测应使用 refresh_token。
+        let biz_token = session.refresh_token();
+        let flysource_sign = self.signer.sign(biz_token, url.as_str(), now_utc);
 
         let resp = self
             .client
             .get(url)
-            .header(header::AUTHORIZATION, self.school_fixed_authorization.clone())
-            .header("FlySource-Auth", self.signer.auth(session.access_token()))
-            .header("FlySource-sign", flysource_sign)
+            .header(
+                header::AUTHORIZATION,
+                self.school_fixed_authorization.clone(),
+            )
+            .header("flysource-auth", self.signer.auth(biz_token))
+            .header("flysource-sign", flysource_sign)
             .send()
             .await
             .map_err(|_| DomainError::RemoteUnavailable {
                 origin: ErrorSource::School,
             })?;
 
-        let body = resp
-            .json::<ApiResp<TaskListData>>()
-            .await
-            .map_err(|_| DomainError::RemoteUnavailable {
+        let body = resp.json::<ApiResp<TaskListData>>().await.map_err(|_| {
+            DomainError::RemoteUnavailable {
                 origin: ErrorSource::School,
-            })?;
+            }
+        })?;
 
         if body.code != 200 {
             return Err(DomainError::UpstreamRejected {
@@ -269,6 +294,7 @@ impl SchoolGateway for AhutGateway {
         session: &SchoolSession,
         task_id: &str,
     ) -> Result<(), DomainError> {
+        let biz_token = session.refresh_token();
         let wechat_url = self.api_url(&format!(
             "flySource-base/wechat/getWechatMpConfig?configUrl=https://xskq.ahut.edu.cn/wise/pages/ssgl/dormsign?taskId={task_id}&autoSign=1&scanSign=0&userId={}",
             session.student_id()
@@ -277,12 +303,15 @@ impl SchoolGateway for AhutGateway {
         let wechat_resp = self
             .client
             .get(wechat_url.clone())
-            .header(header::AUTHORIZATION, self.school_fixed_authorization.clone())
-            .header("FlySource-Auth", self.signer.auth(session.access_token()))
             .header(
-                "FlySource-sign",
+                header::AUTHORIZATION,
+                self.school_fixed_authorization.clone(),
+            )
+            .header("flysource-auth", self.signer.auth(biz_token))
+            .header(
+                "flysource-sign",
                 self.signer
-                    .sign(session.access_token(), wechat_url.as_str(), Utc::now()),
+                    .sign(biz_token, wechat_url.as_str(), Utc::now()),
             )
             .send()
             .await
@@ -305,18 +334,20 @@ impl SchoolGateway for AhutGateway {
             });
         }
 
-        let api_log_url = self.api_url(
-            "flySource-base/apiLog/save?menuTitle=%E6%99%9A%E5%AF%9D%E7%AD%BE%E5%88%B0",
-        )?;
+        let api_log_url = self
+            .api_url("flySource-base/apiLog/save?menuTitle=%E6%99%9A%E5%AF%9D%E7%AD%BE%E5%88%B0")?;
         let api_log_resp = self
             .client
             .post(api_log_url.clone())
-            .header(header::AUTHORIZATION, self.school_fixed_authorization.clone())
-            .header("FlySource-Auth", self.signer.auth(session.access_token()))
             .header(
-                "FlySource-sign",
+                header::AUTHORIZATION,
+                self.school_fixed_authorization.clone(),
+            )
+            .header("flysource-auth", self.signer.auth(biz_token))
+            .header(
+                "flysource-sign",
                 self.signer
-                    .sign(session.access_token(), api_log_url.as_str(), Utc::now()),
+                    .sign(biz_token, api_log_url.as_str(), Utc::now()),
             )
             .send()
             .await
@@ -342,9 +373,8 @@ impl SchoolGateway for AhutGateway {
     ) -> Result<(), DomainError> {
         let url = self.api_url("flySource-yxgl/dormSignRecord/add")?;
         let now_utc = Utc::now();
-        let local = target
-            .occurred_at_utc()
-            .with_timezone(&SCHOOL_TIME_ZONE);
+        let biz_token = session.refresh_token();
+        let local = target.occurred_at_utc().with_timezone(&SCHOOL_TIME_ZONE);
 
         let payload = serde_json::json!({
             "taskId": target.task_id(),
@@ -364,12 +394,15 @@ impl SchoolGateway for AhutGateway {
         let resp = self
             .client
             .post(url.clone())
-            .header(header::AUTHORIZATION, self.school_fixed_authorization.clone())
-            .header("FlySource-Auth", self.signer.auth(session.access_token()))
             .header(
-                "FlySource-sign",
+                header::AUTHORIZATION,
+                self.school_fixed_authorization.clone(),
+            )
+            .header("flysource-auth", self.signer.auth(biz_token))
+            .header(
+                "flysource-sign",
                 self.signer
-                    .sign(session.access_token(), url.as_str(), now_utc),
+                    .sign(biz_token, url.as_str(), now_utc),
             )
             .json(&payload)
             .send()
