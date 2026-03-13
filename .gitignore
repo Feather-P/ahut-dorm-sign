@@ -1,3 +1,7 @@
 /target
 
 .DS_Store
+
+.env
+tests/.env.test
+tests/.env.test.local

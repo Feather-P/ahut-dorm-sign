@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use chrono::{Datelike, NaiveDate, NaiveTime, Utc};
 use reqwest::{Client, Url, header};
-use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::domain::{
@@ -17,14 +16,11 @@ use crate::domain::{
     },
 };
 
+use super::gateway_support::{
+    ApiResp, TaskListData, TokenResp, SCHOOL_TIME_ZONE, build_wechat_headers,
+    ensure_api_success, map_transport_err, map_upstream_rejected, token_expired_at,
+};
 use super::week_mapper::{parse_school_week, to_school_week};
-
-/// 学校侧业务时间固定使用 Asia/Shanghai。
-///
-/// 约定：
-/// 1) 领域层/存储层统一传递 UTC（DateTime<Utc> / PostgreSQL timestamptz）。
-/// 2) 仅在和学校 API 交互时做时区转换。
-const SCHOOL_TIME_ZONE: chrono_tz::Tz = chrono_tz::Asia::Shanghai;
 
 pub struct AhutGateway {
     client: Client,
@@ -62,53 +58,6 @@ impl AhutGateway {
     }
 }
 
-#[derive(Debug, Deserialize)]
-struct TokenResp {
-    access_token: Option<String>,
-    refresh_token: Option<String>,
-    expires_in: Option<i64>,
-    error_description: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct ApiResp<T> {
-    code: i64,
-    msg: String,
-    data: Option<T>,
-}
-
-#[derive(Debug, Deserialize)]
-struct TaskListData {
-    records: Vec<TaskItem>,
-}
-
-#[derive(Debug, Deserialize)]
-struct TaskItem {
-    #[serde(rename = "taskId")]
-    task_id: String,
-    #[serde(rename = "taskName")]
-    task_name: String,
-    #[serde(rename = "taskStartDate")]
-    task_start_date: String,
-    #[serde(rename = "taskEndDate")]
-    task_end_date: String,
-    #[serde(rename = "signStartTime")]
-    sign_start_time: String,
-    #[serde(rename = "signEndTime")]
-    sign_end_time: String,
-    #[serde(rename = "signWeek")]
-    sign_week: String,
-}
-
-fn normalize_access_token(raw: String) -> String {
-    let trimmed = raw.trim();
-    if trimmed.len() >= 7 && trimmed[..7].eq_ignore_ascii_case("bearer ") {
-        trimmed[7..].trim().to_string()
-    } else {
-        trimmed.to_string()
-    }
-}
-
 #[async_trait]
 impl SchoolGateway for AhutGateway {
     async fn authenticate(&self, user: &SchoolUser) -> Result<SchoolToken, DomainError> {
@@ -132,16 +81,12 @@ impl SchoolGateway for AhutGateway {
             )
             .send()
             .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
+            .map_err(|_| map_transport_err())?;
 
         let body = resp
             .json::<TokenResp>()
             .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
+            .map_err(|_| map_transport_err())?;
 
         let access_token = body.access_token.ok_or_else(|| {
             if body
@@ -164,14 +109,10 @@ impl SchoolGateway for AhutGateway {
             }
         })?;
 
-        let access_token = normalize_access_token(access_token);
-        let refresh_token = body
-            .refresh_token
-            .map(normalize_access_token)
-            .unwrap_or_else(|| access_token.clone());
+        let refresh_token = body.refresh_token.unwrap_or_else(|| access_token.clone());
         let expires_in = body.expires_in.unwrap_or(3600);
         let now_utc = Utc::now();
-        let expired_at = now_utc + chrono::Duration::seconds(expires_in);
+        let expired_at = token_expired_at(now_utc, expires_in);
         SchoolToken::new(access_token, refresh_token, expired_at)
     }
 
@@ -192,28 +133,20 @@ impl SchoolGateway for AhutGateway {
             )
             .send()
             .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
+            .map_err(|_| map_transport_err())?;
 
         let body = resp
             .json::<TokenResp>()
             .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
+            .map_err(|_| map_transport_err())?;
 
         let access_token = body.access_token.ok_or(DomainError::TokenExpired {
             origin: ErrorSource::School,
         })?;
-        let access_token = normalize_access_token(access_token);
-        let refresh_token = body
-            .refresh_token
-            .map(normalize_access_token)
-            .unwrap_or_else(|| access_token.clone());
+        let refresh_token = body.refresh_token.unwrap_or_else(|| access_token.clone());
         let expires_in = body.expires_in.unwrap_or(7200);
         let now_utc = Utc::now();
-        let expired_at = now_utc + chrono::Duration::seconds(expires_in);
+        let expired_at = token_expired_at(now_utc, expires_in);
         SchoolToken::new(access_token, refresh_token, expired_at)
     }
 
@@ -226,37 +159,31 @@ impl SchoolGateway for AhutGateway {
         )?;
         let now_utc = Utc::now();
         // 学校业务接口签名与 flysource-auth 实测应使用 refresh_token。
-        let biz_token = session.refresh_token();
-        let flysource_sign = self.signer.sign(biz_token, url.as_str(), now_utc);
+        let biz_token = session.refresh_token().trim();
+        let headers = build_wechat_headers(
+            session,
+            &self.school_fixed_authorization,
+            self.signer.auth(biz_token),
+            self.signer.sign(biz_token, url.as_str(), now_utc),
+            Some(format!(
+                "https://xskq.ahut.edu.cn/wise/pages/ssgl/dormsign?&userId={}",
+                session.student_id()
+            )),
+        );
 
         let resp = self
             .client
             .get(url)
-            .header(
-                header::AUTHORIZATION,
-                self.school_fixed_authorization.clone(),
-            )
-            .header("flysource-auth", self.signer.auth(biz_token))
-            .header("flysource-sign", flysource_sign)
+            .headers(headers)
             .send()
             .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
+            .map_err(|_| map_transport_err())?;
 
-        let body = resp.json::<ApiResp<TaskListData>>().await.map_err(|_| {
-            DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            }
-        })?;
-
-        if body.code != 200 {
-            return Err(DomainError::UpstreamRejected {
-                origin: ErrorSource::School,
-                code: Some(body.code),
-                message: body.msg,
-            });
-        }
+        let body = ensure_api_success(
+            resp.json::<ApiResp<TaskListData>>()
+                .await
+                .map_err(|_| map_transport_err())?,
+        )?;
 
         let tasks = body
             .data
@@ -294,73 +221,56 @@ impl SchoolGateway for AhutGateway {
         session: &SchoolSession,
         task_id: &str,
     ) -> Result<(), DomainError> {
-        let biz_token = session.refresh_token();
+        let biz_token = session.refresh_token().trim();
         let wechat_url = self.api_url(&format!(
             "flySource-base/wechat/getWechatMpConfig?configUrl=https://xskq.ahut.edu.cn/wise/pages/ssgl/dormsign?taskId={task_id}&autoSign=1&scanSign=0&userId={}",
             session.student_id()
         ))?;
+        let wechat_headers = build_wechat_headers(
+            session,
+            &self.school_fixed_authorization,
+            self.signer.auth(biz_token),
+            self.signer.sign(biz_token, wechat_url.as_str(), Utc::now()),
+            None,
+        );
 
         let wechat_resp = self
             .client
             .get(wechat_url.clone())
-            .header(
-                header::AUTHORIZATION,
-                self.school_fixed_authorization.clone(),
-            )
-            .header("flysource-auth", self.signer.auth(biz_token))
-            .header(
-                "flysource-sign",
-                self.signer
-                    .sign(biz_token, wechat_url.as_str(), Utc::now()),
-            )
+            .headers(wechat_headers)
             .send()
             .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
+            .map_err(|_| map_transport_err())?;
 
-        let wechat_body = wechat_resp
-            .json::<ApiResp<serde_json::Value>>()
-            .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
-
-        if wechat_body.code != 200 {
-            return Err(DomainError::UpstreamRejected {
-                origin: ErrorSource::School,
-                code: Some(wechat_body.code),
-                message: wechat_body.msg,
-            });
-        }
+        let _ = ensure_api_success(
+            wechat_resp
+                .json::<ApiResp<serde_json::Value>>()
+                .await
+                .map_err(|_| map_transport_err())?,
+        )?;
 
         let api_log_url = self
             .api_url("flySource-base/apiLog/save?menuTitle=%E6%99%9A%E5%AF%9D%E7%AD%BE%E5%88%B0")?;
+        let api_log_headers = build_wechat_headers(
+            session,
+            &self.school_fixed_authorization,
+            self.signer.auth(biz_token),
+            self.signer.sign(biz_token, api_log_url.as_str(), Utc::now()),
+            None,
+        );
         let api_log_resp = self
             .client
             .post(api_log_url.clone())
-            .header(
-                header::AUTHORIZATION,
-                self.school_fixed_authorization.clone(),
-            )
-            .header("flysource-auth", self.signer.auth(biz_token))
-            .header(
-                "flysource-sign",
-                self.signer
-                    .sign(biz_token, api_log_url.as_str(), Utc::now()),
-            )
+            .headers(api_log_headers)
             .send()
             .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
+            .map_err(|_| map_transport_err())?;
 
         if !api_log_resp.status().is_success() {
-            return Err(DomainError::UpstreamRejected {
-                origin: ErrorSource::School,
-                code: Some(api_log_resp.status().as_u16() as i64),
-                message: "apiLog 请求失败".to_string(),
-            });
+            return Err(map_upstream_rejected(
+                api_log_resp.status().as_u16() as i64,
+                "apiLog 请求失败".to_string(),
+            ));
         }
 
         Ok(())
@@ -369,21 +279,29 @@ impl SchoolGateway for AhutGateway {
     async fn submit_checkin(
         &self,
         session: &SchoolSession,
-        target: CheckinCommand,
+        check_cmd: CheckinCommand,
     ) -> Result<(), DomainError> {
         let url = self.api_url("flySource-yxgl/dormSignRecord/add")?;
         let now_utc = Utc::now();
-        let biz_token = session.refresh_token();
-        let local = target.occurred_at_utc().with_timezone(&SCHOOL_TIME_ZONE);
+        let biz_token = session.refresh_token().trim();
+        let local = check_cmd.occurred_at_utc().with_timezone(&SCHOOL_TIME_ZONE);
+        let submit_headers = build_wechat_headers(
+            session,
+            &self.school_fixed_authorization,
+            self.signer.auth(biz_token),
+            self.signer.sign(biz_token, url.as_str(), now_utc),
+            None,
+        );
 
         let payload = serde_json::json!({
-            "taskId": target.task_id(),
+            "taskId": check_cmd.task_id(),
             "signAddress": "",
-            "locationAccuracy": target.accuracy_meters(),
-            "signLat": target.point().lat(),
-            "signLng": target.point().lng(),
+            "locationAccuracy": check_cmd.accuracy_meters(),
+            "signLat": check_cmd.point().lat(),
+            "signLng": check_cmd.point().lng(),
             "signType": 0,
             "fileId": "",
+            // 学校这里确实固定写着的这个路径，但名字是Base64是何意味？
             "imgBase64": "/static/images/dormitory/photo.png",
             "signDate": local.format("%Y-%m-%d").to_string(),
             "signTime": local.format("%H:%M:%S").to_string(),
@@ -394,38 +312,21 @@ impl SchoolGateway for AhutGateway {
         let resp = self
             .client
             .post(url.clone())
-            .header(
-                header::AUTHORIZATION,
-                self.school_fixed_authorization.clone(),
-            )
-            .header("flysource-auth", self.signer.auth(biz_token))
-            .header(
-                "flysource-sign",
-                self.signer
-                    .sign(biz_token, url.as_str(), now_utc),
-            )
+            .headers(submit_headers)
             .json(&payload)
             .send()
             .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
+            .map_err(|_| map_transport_err())?;
 
         let body = resp
             .json::<ApiResp<serde_json::Value>>()
             .await
-            .map_err(|_| DomainError::RemoteUnavailable {
-                origin: ErrorSource::School,
-            })?;
+            .map_err(|_| map_transport_err())?;
 
         if body.code == 200 || body.msg.contains("已完成签到") {
             return Ok(());
         }
 
-        Err(DomainError::UpstreamRejected {
-            origin: ErrorSource::School,
-            code: Some(body.code),
-            message: body.msg,
-        })
+        Err(map_upstream_rejected(body.code, body.msg))
     }
 }

@@ -16,7 +16,7 @@
 
 ## 参考说明
 
-本项目在早期方案梳理与场景理解阶段，参考了开源项目：
+本项目的网络交互和UA相关参考了开源项目：
 
 - <https://github.com/UnthinkingBrain/-_ahut_wqqd>
 
@@ -36,3 +36,22 @@
 - 本项目不构成法律意见或合规承诺。
 - 使用者需自行承担使用后果与责任。
 - 仓库维护者有权删除或拒绝可能导致违规滥用的实现与需求。
+
+## 测试
+
+仓库包含一个默认忽略的真实链路集成测试 [`test_school_checkin_e2e_from_env()`](tests/school_checkin_e2e.rs:26)。
+
+### 配置方式
+
+1. 复制 [`tests/.env.test.example`](tests/.env.test.example) 为 `tests/.env.test.local` 并填入真实值。
+2. 测试会按以下优先级加载配置：
+   - 环境变量 `TEST_DOTENV_PATH` 指向的文件
+   - `tests/.env.test.local`
+   - `tests/.env.test`
+   - 若都不存在，则仅使用当前进程环境变量
+
+### 运行方式
+
+```bash
+cargo test --test school_checkin_e2e test_school_checkin_e2e_from_env -- --ignored --nocapture
+```

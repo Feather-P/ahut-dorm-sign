@@ -1,12 +1,9 @@
-use std::env;
-
 use aes_gcm::{
     Aes256Gcm, Nonce,
     aead::{Aead, KeyInit},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
 use chrono::{DateTime, Utc};
-use dotenvy::dotenv;
 use pbkdf2::pbkdf2_hmac;
 use rand::RngCore;
 use sha2::Sha256;
@@ -28,10 +25,7 @@ pub struct AesGcmSchoolCredentialProtector {
 }
 
 impl AesGcmSchoolCredentialProtector {
-    pub fn from_env() -> Result<Self, DomainError> {
-        let _ = dotenv();
-        let master_key = env::var("SCHOOL_CREDENTIAL_MASTER_KEY")
-            .map_err(|_| DomainError::InvalidCredentialEnvelope)?;
+    pub fn new(master_key: String) -> Result<Self, DomainError> {
         if master_key.trim().is_empty() {
             return Err(DomainError::InvalidCredentialEnvelope);
         }
