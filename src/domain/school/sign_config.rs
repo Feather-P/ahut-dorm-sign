@@ -90,7 +90,7 @@ impl SchoolSignConfig {
         utc_now >= self.allow_sign_timerange_start && utc_now <= self.allow_sign_timerange_end
     }
 
-    /// 由静态配置 + 运行时上下文，生成领域签到命令。
+    /// 由静态配置 + 当前时间，生成领域签到命令。
     pub fn build_checkin_command(
         &self,
         utc_now: DateTime<Utc>,

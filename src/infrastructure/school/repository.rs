@@ -223,8 +223,15 @@ impl SchoolUserRepository for PgSchoolRepository {
         Ok(())
     }
 
-    async fn delete_by_student_id(&self, student_id: &str) -> Result<bool, DomainError> {
-        let affected = sqlx::query("DELETE FROM school_users WHERE student_id = $1")
+    async fn delete_by_owner_and_student(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
+    ) -> Result<bool, DomainError> {
+        let affected = sqlx::query(
+            "DELETE FROM school_users WHERE owner_user_id = $1 AND student_id = $2",
+        )
+            .bind(owner_user_id)
             .bind(student_id)
             .execute(&self.pool)
             .await
@@ -422,9 +429,31 @@ impl SchoolSignTaskRepository for PgSchoolRepository {
         utc_now: DateTime<Utc>,
     ) -> Result<Option<SchoolSignTask>, DomainError> {
         let rows = sqlx::query(
-            "SELECT * FROM school_sign_tasks WHERE student_id = $1 ORDER BY school_task_id",
+            r#"
+            SELECT *
+            FROM school_sign_tasks
+            WHERE student_id = $1
+              AND date_start <= (($2 AT TIME ZONE time_zone)::date)
+              AND date_end >= (($2 AT TIME ZONE time_zone)::date)
+              AND time_start <= (($2 AT TIME ZONE time_zone)::time)
+              AND time_end >= (($2 AT TIME ZONE time_zone)::time)
+              AND days_of_week LIKE ('%' ||
+                (CASE EXTRACT(ISODOW FROM ($2 AT TIME ZONE time_zone))
+                  WHEN 1 THEN '星期一'
+                  WHEN 2 THEN '星期二'
+                  WHEN 3 THEN '星期三'
+                  WHEN 4 THEN '星期四'
+                  WHEN 5 THEN '星期五'
+                  WHEN 6 THEN '星期六'
+                  ELSE '星期日'
+                END)
+              || '%')
+            ORDER BY school_task_id
+            LIMIT 1
+            "#,
         )
         .bind(student_id)
+        .bind(utc_now)
         .fetch_all(&self.pool)
         .await
         .map_err(map_sqlx_err)?;

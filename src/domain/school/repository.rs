@@ -26,7 +26,11 @@ pub trait SchoolUserRepository: Send + Sync {
 
     async fn save(&self, user: SchoolUser) -> SchoolRepositoryResult<()>;
 
-    async fn delete_by_student_id(&self, student_id: &str) -> SchoolRepositoryResult<bool>;
+    async fn delete_by_owner_and_student(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
+    ) -> SchoolRepositoryResult<bool>;
 }
 
 #[async_trait]
