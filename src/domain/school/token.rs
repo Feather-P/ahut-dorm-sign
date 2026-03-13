@@ -39,7 +39,7 @@ impl SchoolToken {
         if refresh_token.trim().is_empty() {
             return Err(DomainError::BlankToken);
         }
-        
+
         self.access_token = access_token;
         self.refresh_token = refresh_token;
         self.expired_at = expired_at;

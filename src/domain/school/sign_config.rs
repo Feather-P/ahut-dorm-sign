@@ -3,11 +3,7 @@ use uuid::Uuid;
 
 use crate::domain::{
     error::DomainError,
-    school::{
-        location::GeoPoint,
-        noise::CheckinNoiseGenerator,
-        task::CheckinCommand,
-    },
+    school::{location::GeoPoint, noise::CheckinNoiseGenerator, task::CheckinCommand},
 };
 
 pub struct SchoolSignConfig {

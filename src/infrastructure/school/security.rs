@@ -14,9 +14,7 @@ use sha2::Sha256;
 use crate::domain::{
     error::DomainError,
     school::{
-        credential::SchoolCredential,
-        crypto::SchoolCredentialProtector,
-        sign::SchoolSignGenerator,
+        credential::SchoolCredential, crypto::SchoolCredentialProtector, sign::SchoolSignGenerator,
     },
 };
 
@@ -57,7 +55,10 @@ impl SchoolCredentialProtector for AesGcmSchoolCredentialProtector {
         let key = self.derive_key(&salt, PBKDF2_ITER);
         let cipher = Aes256Gcm::new_from_slice(&key).expect("invalid aes key length");
         let ciphertext = cipher
-            .encrypt(Nonce::from_slice(&nonce), school_origin_credential.as_bytes())
+            .encrypt(
+                Nonce::from_slice(&nonce),
+                school_origin_credential.as_bytes(),
+            )
             .expect("encrypt failed");
 
         let params = serde_json::json!({
@@ -78,8 +79,8 @@ impl SchoolCredentialProtector for AesGcmSchoolCredentialProtector {
         let params_raw = STANDARD
             .decode(school_credential.params_b64())
             .map_err(|_| DomainError::InvalidCredentialEnvelope)?;
-        let params: serde_json::Value =
-            serde_json::from_slice(&params_raw).map_err(|_| DomainError::InvalidCredentialEnvelope)?;
+        let params: serde_json::Value = serde_json::from_slice(&params_raw)
+            .map_err(|_| DomainError::InvalidCredentialEnvelope)?;
 
         let iter = params
             .get("iter")
@@ -108,7 +109,8 @@ impl SchoolCredentialProtector for AesGcmSchoolCredentialProtector {
         }
 
         let key = self.derive_key(&salt, iter);
-        let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| DomainError::CredentialDecryptFailed)?;
+        let cipher =
+            Aes256Gcm::new_from_slice(&key).map_err(|_| DomainError::CredentialDecryptFailed)?;
         let plaintext = cipher
             .decrypt(Nonce::from_slice(&nonce), ciphertext.as_ref())
             .map_err(|_| DomainError::CredentialDecryptFailed)?;
@@ -135,7 +137,7 @@ impl SchoolSignGenerator for FlySourceSigner {
         let first = format!("{timestamp}{access_token}");
         let first_hash = format!("{:x}", md5::compute(first));
         let second = format!("{}{}", to_sign_path(url), first_hash);
-        let second_hash = format!("{:x}", md5::compute(second));
+        let second_hash = format!("{:x}", md5::compute(&second));
         let encoded_ts = STANDARD.encode(timestamp.as_bytes());
         format!("{second_hash}1.{encoded_ts}")
     }
@@ -168,7 +170,10 @@ mod tests {
         );
 
         let hash1 = format!("{:x}", md5::compute("1700000000000token-abc"));
-        let hash2 = format!("{:x}", md5::compute(format!("/api/auth/login?sign={hash1}")));
+        let hash2 = format!(
+            "{:x}",
+            md5::compute(format!("/api/auth/login?sign={hash1}"))
+        );
         let expect = format!("{}1.{}", hash2, STANDARD.encode("1700000000000"));
 
         assert_eq!(sign, expect);
@@ -181,7 +186,10 @@ mod tests {
         let sign = signer.sign("token-abc", "/api/auth/login?x=1&y=2", now);
 
         let hash1 = format!("{:x}", md5::compute("1700000000000token-abc"));
-        let hash2 = format!("{:x}", md5::compute(format!("/api/auth/login?sign={hash1}")));
+        let hash2 = format!(
+            "{:x}",
+            md5::compute(format!("/api/auth/login?sign={hash1}"))
+        );
         let expect = format!("{}1.{}", hash2, STANDARD.encode("1700000000000"));
 
         assert_eq!(sign, expect);
@@ -193,6 +201,9 @@ mod tests {
             to_sign_path("https://example.com/api/auth/login?x=1&y=2"),
             "/api/auth/login?sign="
         );
-        assert_eq!(to_sign_path("/api/auth/login?x=1&y=2"), "/api/auth/login?sign=");
+        assert_eq!(
+            to_sign_path("/api/auth/login?x=1&y=2"),
+            "/api/auth/login?sign="
+        );
     }
 }

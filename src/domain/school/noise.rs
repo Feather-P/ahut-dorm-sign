@@ -8,9 +8,5 @@ pub trait CheckinNoiseGenerator: Send + Sync {
         max_radius_meters: f64,
     ) -> GeoPoint;
 
-    fn sample_accuracy(
-        &self,
-        min_accuracy_meters: f64,
-        max_accuracy_meters: f64,
-    ) -> f64;
+    fn sample_accuracy(&self, min_accuracy_meters: f64, max_accuracy_meters: f64) -> f64;
 }

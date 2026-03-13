@@ -2,7 +2,7 @@ use chrono::{DateTime, Duration, Utc};
 
 use crate::domain::{
     error::{DomainError, ErrorKind},
-    school::{session::SchoolSession},
+    school::session::SchoolSession,
 };
 
 #[derive(Debug, Clone)]
@@ -114,9 +114,7 @@ impl SchoolAuthDecider {
         utc_now: DateTime<Utc>,
     ) -> AuthDecision {
         match session {
-            None => {
-                return AuthDecision::ReAuthenticate
-            }
+            None => return AuthDecision::ReAuthenticate,
             Some(session) => {
                 if session.need_refresh(
                     utc_now,

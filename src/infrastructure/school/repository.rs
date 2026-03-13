@@ -28,9 +28,7 @@ pub struct PgSchoolRepository {
 
 impl PgSchoolRepository {
     pub async fn connect(database_url: &str) -> Result<Self, DomainError> {
-        let pool = PgPool::connect(database_url)
-            .await
-            .map_err(map_sqlx_err)?;
+        let pool = PgPool::connect(database_url).await.map_err(map_sqlx_err)?;
         Ok(Self { pool })
     }
 
@@ -278,12 +276,17 @@ impl SchoolSignConfigRepository for PgSchoolRepository {
         row.map(|r| map_row_to_sign_config(&r)).transpose()
     }
 
-    async fn list_by_student_id(&self, student_id: &str) -> Result<Vec<SchoolSignConfig>, DomainError> {
-        let rows = sqlx::query("SELECT * FROM school_sign_configs WHERE student_id = $1 ORDER BY school_task_id")
-            .bind(student_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(map_sqlx_err)?;
+    async fn list_by_student_id(
+        &self,
+        student_id: &str,
+    ) -> Result<Vec<SchoolSignConfig>, DomainError> {
+        let rows = sqlx::query(
+            "SELECT * FROM school_sign_configs WHERE student_id = $1 ORDER BY school_task_id",
+        )
+        .bind(student_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
         rows.iter().map(map_row_to_sign_config).collect()
     }
 
@@ -418,11 +421,13 @@ impl SchoolSignTaskRepository for PgSchoolRepository {
         student_id: &str,
         utc_now: DateTime<Utc>,
     ) -> Result<Option<SchoolSignTask>, DomainError> {
-        let rows = sqlx::query("SELECT * FROM school_sign_tasks WHERE student_id = $1 ORDER BY school_task_id")
-            .bind(student_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(map_sqlx_err)?;
+        let rows = sqlx::query(
+            "SELECT * FROM school_sign_tasks WHERE student_id = $1 ORDER BY school_task_id",
+        )
+        .bind(student_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
 
         for row in rows {
             let task = map_row_to_sign_task(&row)?;
@@ -433,12 +438,17 @@ impl SchoolSignTaskRepository for PgSchoolRepository {
         Ok(None)
     }
 
-    async fn list_by_student_id(&self, student_id: &str) -> Result<Vec<SchoolSignTask>, DomainError> {
-        let rows = sqlx::query("SELECT * FROM school_sign_tasks WHERE student_id = $1 ORDER BY school_task_id")
-            .bind(student_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(map_sqlx_err)?;
+    async fn list_by_student_id(
+        &self,
+        student_id: &str,
+    ) -> Result<Vec<SchoolSignTask>, DomainError> {
+        let rows = sqlx::query(
+            "SELECT * FROM school_sign_tasks WHERE student_id = $1 ORDER BY school_task_id",
+        )
+        .bind(student_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
         rows.iter().map(map_row_to_sign_task).collect()
     }
 
@@ -489,13 +499,15 @@ impl SchoolSignTaskRepository for PgSchoolRepository {
         student_id: &str,
         school_task_id: &str,
     ) -> Result<bool, DomainError> {
-        let affected = sqlx::query("DELETE FROM school_sign_tasks WHERE student_id = $1 AND school_task_id = $2")
-            .bind(student_id)
-            .bind(school_task_id)
-            .execute(&self.pool)
-            .await
-            .map_err(map_sqlx_err)?
-            .rows_affected();
+        let affected = sqlx::query(
+            "DELETE FROM school_sign_tasks WHERE student_id = $1 AND school_task_id = $2",
+        )
+        .bind(student_id)
+        .bind(school_task_id)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?
+        .rows_affected();
         Ok(affected > 0)
     }
 }
@@ -549,13 +561,14 @@ impl SchoolSessionRepository for PgSchoolRepository {
         owner_user_id: uuid::Uuid,
         student_id: &str,
     ) -> Result<bool, DomainError> {
-        let affected = sqlx::query("DELETE FROM school_sessions WHERE owner_user_id = $1 AND student_id = $2")
-            .bind(owner_user_id)
-            .bind(student_id)
-            .execute(&self.pool)
-            .await
-            .map_err(map_sqlx_err)?
-            .rows_affected();
+        let affected =
+            sqlx::query("DELETE FROM school_sessions WHERE owner_user_id = $1 AND student_id = $2")
+                .bind(owner_user_id)
+                .bind(student_id)
+                .execute(&self.pool)
+                .await
+                .map_err(map_sqlx_err)?
+                .rows_affected();
         Ok(affected > 0)
     }
 }

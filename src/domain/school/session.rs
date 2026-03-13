@@ -18,10 +18,10 @@ impl SchoolSession {
         if student_id.trim().is_empty() {
             return Err(DomainError::BlankSchoolUserId);
         }
-        Ok(Self{
+        Ok(Self {
             owner_user_id,
             student_id,
-            token
+            token,
         })
     }
 
@@ -32,7 +32,7 @@ impl SchoolSession {
     pub fn student_id(&self) -> &str {
         &self.student_id
     }
-    
+
     pub fn access_token(&self) -> &str {
         &self.token.access_token()
     }

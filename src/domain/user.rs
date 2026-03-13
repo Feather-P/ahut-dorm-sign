@@ -9,5 +9,5 @@ pub struct SystemUser {
 
 pub enum UserRole {
     Admin,
-    User
+    User,
 }

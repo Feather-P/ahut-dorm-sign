@@ -175,7 +175,7 @@ impl CheckinCommand {
             return Err(DomainError::BlankSchoolTaskId);
         }
         if accuracy_meters.is_infinite() || accuracy_meters <= 0.0 {
-            return Err(DomainError::InvalidLocationAccuracy(accuracy_meters))
+            return Err(DomainError::InvalidLocationAccuracy(accuracy_meters));
         }
         Ok(Self {
             task_id: task_id.to_owned(),
