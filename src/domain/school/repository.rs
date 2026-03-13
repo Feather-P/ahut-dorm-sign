@@ -116,3 +116,26 @@ pub trait SchoolSessionRepository: Send + Sync {
         student_id: &str,
     ) -> SchoolRepositoryResult<bool>;
 }
+
+#[async_trait]
+pub trait SchoolUserCustomUserAgentRepository: Send + Sync {
+    async fn add(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
+        user_agent: &str,
+    ) -> SchoolRepositoryResult<()>;
+
+    async fn delete(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
+        user_agent: &str,
+    ) -> SchoolRepositoryResult<bool>;
+
+    async fn list_by_owner_and_student(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
+    ) -> SchoolRepositoryResult<Vec<String>>;
+}

@@ -9,7 +9,7 @@ use crate::domain::{
         location::GeoPoint,
         repository::{
             SchoolSessionRepository, SchoolSignConfigRepository, SchoolSignTaskRepository,
-            SchoolUserRepository,
+            SchoolUserCustomUserAgentRepository, SchoolUserRepository,
         },
         session::SchoolSession,
         sign_config::SchoolSignConfig,
@@ -599,5 +599,84 @@ impl SchoolSessionRepository for PgSchoolRepository {
                 .map_err(map_sqlx_err)?
                 .rows_affected();
         Ok(affected > 0)
+    }
+}
+
+#[async_trait]
+impl SchoolUserCustomUserAgentRepository for PgSchoolRepository {
+    async fn add(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
+        user_agent: &str,
+    ) -> Result<(), DomainError> {
+        let ua = user_agent.trim();
+        if ua.is_empty() {
+            return Ok(());
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO school_user_custom_user_agents (
+              id, owner_user_id, student_id, user_agent, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, NOW(), NOW())
+            ON CONFLICT (owner_user_id, student_id, user_agent)
+            DO UPDATE SET updated_at = NOW()
+            "#,
+        )
+        .bind(uuid::Uuid::new_v4())
+        .bind(owner_user_id)
+        .bind(student_id)
+        .bind(ua)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+
+        Ok(())
+    }
+
+    async fn delete(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
+        user_agent: &str,
+    ) -> Result<bool, DomainError> {
+        let affected = sqlx::query(
+            r#"
+            DELETE FROM school_user_custom_user_agents
+            WHERE owner_user_id = $1 AND student_id = $2 AND user_agent = $3
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(student_id)
+        .bind(user_agent)
+        .execute(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?
+        .rows_affected();
+
+        Ok(affected > 0)
+    }
+
+    async fn list_by_owner_and_student(
+        &self,
+        owner_user_id: uuid::Uuid,
+        student_id: &str,
+    ) -> Result<Vec<String>, DomainError> {
+        let rows = sqlx::query(
+            r#"
+            SELECT user_agent
+            FROM school_user_custom_user_agents
+            WHERE owner_user_id = $1 AND student_id = $2
+            ORDER BY created_at ASC
+            "#,
+        )
+        .bind(owner_user_id)
+        .bind(student_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_err)?;
+
+        Ok(rows.iter().map(|row| row.get("user_agent")).collect())
     }
 }

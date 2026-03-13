@@ -1,9 +1,17 @@
 use anyhow::{Result, anyhow};
 
 use crate::infrastructure::{
-    config::env_reader::{env_or, env_parse_or, required_env},
+    config::env_reader::{env_parse_or, required_env},
     school::config::{AhutGatewayConfig, normalize_base_url},
 };
+
+fn parse_user_agent_pool(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(|it| it.trim())
+        .filter(|it| !it.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
 
 #[derive(Debug, Clone)]
 pub struct SchoolSecurityConfig {
@@ -29,15 +37,21 @@ impl SchoolInfraConfig {
     pub fn from_env() -> Result<Self> {
         let raw_base_url = required_env("AHUT_BASE_URL")?;
         let master_key = required_env("SCHOOL_CREDENTIAL_MASTER_KEY")?;
+        let fallback_user_agent = required_env("HTTP_FALLBACK_USER_AGENT")?;
+        let default_user_agent_pool = parse_user_agent_pool(&required_env("HTTP_DEFAULT_USER_AGENT_POOL")?);
 
         if master_key.trim().is_empty() {
             return Err(anyhow!("环境变量为空: SCHOOL_CREDENTIAL_MASTER_KEY"));
+        }
+        if default_user_agent_pool.is_empty() {
+            return Err(anyhow!("环境变量为空或无可用UA: HTTP_DEFAULT_USER_AGENT_POOL"));
         }
 
         Ok(Self {
             gateway: AhutGatewayConfig {
                 base_url: normalize_base_url(&raw_base_url),
-                user_agent: env_or("HTTP_USER_AGENT", "ahut-dorm-sign/0.1"),
+                fallback_user_agent,
+                default_user_agent_pool,
                 connect_timeout: std::time::Duration::from_millis(env_parse_or(
                     "HTTP_CONNECT_TIMEOUT_MS",
                     3000u64,
@@ -66,4 +80,3 @@ impl SchoolInfraConfig {
         })
     }
 }
-

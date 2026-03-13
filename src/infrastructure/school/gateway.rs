@@ -17,8 +17,8 @@ use crate::domain::{
 };
 
 use super::gateway_support::{
-    ApiResp, TaskListData, TokenResp, SCHOOL_TIME_ZONE, build_wechat_headers,
-    ensure_api_success, map_transport_err, map_upstream_rejected, token_expired_at,
+    ApiResp, SCHOOL_TIME_ZONE, TaskListData, TokenResp, build_wechat_headers, ensure_api_success,
+    map_transport_err, map_upstream_rejected, token_expired_at,
 };
 use super::week_mapper::{parse_school_week, to_school_week};
 
@@ -153,6 +153,7 @@ impl SchoolGateway for AhutGateway {
     async fn fetch_active_task_list(
         &self,
         session: &SchoolSession,
+        selected_ua: &str,
     ) -> Result<Vec<SchoolSignTask>, DomainError> {
         let url = self.api_url(
             "flySource-yxgl/dormSignTask/getStudentTaskPage?userDataType=student&current=1&size=15",
@@ -163,6 +164,7 @@ impl SchoolGateway for AhutGateway {
         let headers = build_wechat_headers(
             session,
             &self.school_fixed_authorization,
+            selected_ua,
             self.signer.auth(biz_token),
             self.signer.sign(biz_token, url.as_str(), now_utc),
             Some(format!(
@@ -220,6 +222,7 @@ impl SchoolGateway for AhutGateway {
         &self,
         session: &SchoolSession,
         task_id: &str,
+        selected_ua: &str,
     ) -> Result<(), DomainError> {
         let biz_token = session.refresh_token().trim();
         let wechat_url = self.api_url(&format!(
@@ -229,6 +232,7 @@ impl SchoolGateway for AhutGateway {
         let wechat_headers = build_wechat_headers(
             session,
             &self.school_fixed_authorization,
+            selected_ua,
             self.signer.auth(biz_token),
             self.signer.sign(biz_token, wechat_url.as_str(), Utc::now()),
             None,
@@ -254,8 +258,10 @@ impl SchoolGateway for AhutGateway {
         let api_log_headers = build_wechat_headers(
             session,
             &self.school_fixed_authorization,
+            selected_ua,
             self.signer.auth(biz_token),
-            self.signer.sign(biz_token, api_log_url.as_str(), Utc::now()),
+            self.signer
+                .sign(biz_token, api_log_url.as_str(), Utc::now()),
             None,
         );
         let api_log_resp = self
@@ -280,6 +286,7 @@ impl SchoolGateway for AhutGateway {
         &self,
         session: &SchoolSession,
         check_cmd: CheckinCommand,
+        selected_ua: &str,
     ) -> Result<(), DomainError> {
         let url = self.api_url("flySource-yxgl/dormSignRecord/add")?;
         let now_utc = Utc::now();
@@ -288,6 +295,7 @@ impl SchoolGateway for AhutGateway {
         let submit_headers = build_wechat_headers(
             session,
             &self.school_fixed_authorization,
+            selected_ua,
             self.signer.auth(biz_token),
             self.signer.sign(biz_token, url.as_str(), now_utc),
             None,

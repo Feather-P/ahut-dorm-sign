@@ -21,6 +21,7 @@ pub trait SchoolGateway: Send + Sync {
     async fn fetch_active_task_list(
         &self,
         session: &SchoolSession,
+        selected_ua: &str,
     ) -> Result<Vec<SchoolSignTask>, DomainError>;
 
     /// 实现本函数的时候应该实现:
@@ -30,11 +31,13 @@ pub trait SchoolGateway: Send + Sync {
         &self,
         session: &SchoolSession,
         task_id: &str,
+        selected_ua: &str,
     ) -> Result<(), DomainError>;
 
     async fn submit_checkin(
         &self,
         session: &SchoolSession,
         target: CheckinCommand,
+        selected_ua: &str,
     ) -> Result<(), DomainError>;
 }

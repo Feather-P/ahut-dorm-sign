@@ -13,7 +13,6 @@ use crate::domain::{
 /// 1) 领域层/存储层统一传递 UTC（DateTime<Utc> / PostgreSQL timestamptz）。
 /// 2) 仅在和学校 API 交互时做时区转换。
 pub const SCHOOL_TIME_ZONE: chrono_tz::Tz = chrono_tz::Asia::Shanghai;
-pub const WECHAT_UA: &str = "Mozilla/5.0 (Linux; Android 15; MIX Fold 4 Build/TKQ1.240502.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/128.0.6613.137 Mobile Safari/537.36 MicroMessenger/8.0.61.2660(0x28003D37) WeChat/arm64 Weixin NetType/WIFI Language/zh_CN ABI/arm64";
 
 #[derive(Debug, Deserialize)]
 pub struct TokenResp {
@@ -78,6 +77,7 @@ pub fn ensure_api_success<T>(resp: ApiResp<T>) -> Result<ApiResp<T>, DomainError
 pub fn build_wechat_headers(
     session: &SchoolSession,
     school_fixed_authorization: &str,
+    user_agent: &str,
     signer_auth: String,
     signer_sign: String,
     referer: Option<String>,
@@ -88,7 +88,9 @@ pub fn build_wechat_headers(
         HeaderValue::from_str(school_fixed_authorization)
             .unwrap_or_else(|_| HeaderValue::from_static("")),
     );
-    headers.insert(header::USER_AGENT, HeaderValue::from_static(WECHAT_UA));
+    if let Ok(v) = HeaderValue::from_str(user_agent) {
+        headers.insert(header::USER_AGENT, v);
+    }
     headers.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/json;charset=UTF-8"),

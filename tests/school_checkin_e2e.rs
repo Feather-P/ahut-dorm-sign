@@ -41,6 +41,7 @@ async fn test_school_checkin_e2e_from_env() -> Result<()> {
 
     let infra_config = SchoolInfraConfig::from_env().context("加载基础设施配置失败")?;
     let gateway_config = infra_config.gateway;
+    let selected_ua = gateway_config.pick_user_agent(&[]);
     let client = gateway_config
         .build_client()
         .context("构建 HTTP 客户端失败")?;
@@ -78,7 +79,7 @@ async fn test_school_checkin_e2e_from_env() -> Result<()> {
     let session = SchoolSession::new(Uuid::nil(), student_id.clone(), token).context("构建会话失败")?;
 
     let active_tasks = gateway
-        .fetch_active_task_list(&session)
+        .fetch_active_task_list(&session, &selected_ua)
         .await
         .context("拉取任务列表失败")?;
 
@@ -97,7 +98,7 @@ async fn test_school_checkin_e2e_from_env() -> Result<()> {
     let task_id = task.school_task_id().to_string();
 
     gateway
-        .prepare_checkin_context(&session, &task_id)
+        .prepare_checkin_context(&session, &task_id, &selected_ua)
         .await
         .context("准备签到上下文失败")?;
 
@@ -107,7 +108,7 @@ async fn test_school_checkin_e2e_from_env() -> Result<()> {
         .context("构建签到命令失败")?;
 
     gateway
-        .submit_checkin(&session, command)
+        .submit_checkin(&session, command, &selected_ua)
         .await
         .context("提交签到失败")?;
 

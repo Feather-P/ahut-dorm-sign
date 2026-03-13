@@ -57,6 +57,17 @@ CREATE TABLE IF NOT EXISTS school_sessions (
     PRIMARY KEY (owner_user_id, student_id)
 );
 
+CREATE TABLE IF NOT EXISTS school_user_custom_user_agents (
+    id UUID NOT NULL,
+    owner_user_id UUID NOT NULL,
+    student_id TEXT NOT NULL,
+    user_agent TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id),
+    UNIQUE (owner_user_id, student_id, user_agent)
+);
+
 CREATE INDEX IF NOT EXISTS idx_school_sign_configs_student_enable
     ON school_sign_configs (student_id, enable);
 
@@ -65,4 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_school_sign_tasks_student
 
 CREATE INDEX IF NOT EXISTS idx_school_sessions_expired_at
     ON school_sessions (expired_at);
+
+CREATE INDEX IF NOT EXISTS idx_school_user_custom_user_agents_owner_student
+    ON school_user_custom_user_agents (owner_user_id, student_id);
 
