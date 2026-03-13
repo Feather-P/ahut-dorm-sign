@@ -29,9 +29,18 @@ impl AhutGatewayConfig {
         Ok(Self {
             base_url,
             user_agent: env_or("HTTP_USER_AGENT", "ahut-dorm-sign/0.1"),
-            connect_timeout: Duration::from_millis(env_parse_or("HTTP_CONNECT_TIMEOUT_MS", 3000u64)?),
-            request_timeout: Duration::from_millis(env_parse_or("HTTP_REQUEST_TIMEOUT_MS", 10000u64)?),
-            pool_idle_timeout: Duration::from_secs(env_parse_or("HTTP_POOL_IDLE_TIMEOUT_SECS", 60u64)?),
+            connect_timeout: Duration::from_millis(env_parse_or(
+                "HTTP_CONNECT_TIMEOUT_MS",
+                3000u64,
+            )?),
+            request_timeout: Duration::from_millis(env_parse_or(
+                "HTTP_REQUEST_TIMEOUT_MS",
+                10000u64,
+            )?),
+            pool_idle_timeout: Duration::from_secs(env_parse_or(
+                "HTTP_POOL_IDLE_TIMEOUT_SECS",
+                60u64,
+            )?),
             pool_max_idle_per_host: env_parse_or("HTTP_POOL_MAX_IDLE_PER_HOST", 16usize)?,
             tcp_keepalive: Duration::from_secs(env_parse_or("HTTP_TCP_KEEPALIVE_SECS", 30u64)?),
         })
