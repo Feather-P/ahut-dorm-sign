@@ -3,6 +3,17 @@ use uuid::Uuid;
 
 use crate::domain::access_control::{PermissionCode, RoleCode};
 use crate::domain::error::DomainError;
+use crate::domain::user::{SystemUser, UserPreferences};
+
+// 系统用户储存
+#[async_trait]
+pub trait UserRepository: Send + Sync {
+    async fn list_all_user(&self) -> Result<Vec<SystemUser>, DomainError>;
+    async fn find_by_id(&self, user_id: Uuid) -> Result<Option<SystemUser>, DomainError>;
+    async fn save(&self, user: SystemUser) -> Result<(), DomainError>;
+    async fn update_preference(&self, user_id: Uuid, preferences: UserPreferences) -> Result<(), DomainError>;
+
+}
 
 /// 用户-角色绑定
 #[async_trait]
