@@ -112,6 +112,19 @@ pub enum DomainError {
 
     #[error("持久化层数据损坏: {message}")]
     PersistenceCorrupted { message: String },
+
+    // 权限部分
+    #[error("权限码不能为空")]
+    BlankPermissionCode,
+
+    #[error("角色码不能为空")]
+    BlankRoleCode,
+
+    #[error("用户角色不能为空")]
+    BlankUserRoles,
+
+    #[error("无权限执行该操作")]
+    PermissionDenied,
 }
 
 impl DomainError {
@@ -138,7 +151,11 @@ impl DomainError {
             | DomainError::InvalidCredentialAlgorithm
             | DomainError::CredentialDecryptFailed
             | DomainError::UnsupportedCredentialVersion { .. }
-            | DomainError::TaskNotFound { .. } => ErrorKind::Terminal,
+            | DomainError::TaskNotFound { .. } 
+            | DomainError::BlankPermissionCode 
+            | DomainError::BlankRoleCode
+            | DomainError::BlankUserRoles
+            | DomainError::PermissionDenied => ErrorKind::Terminal,
             DomainError::Unauthorized { .. } | DomainError::TokenExpired { .. } => {
                 ErrorKind::ReauthRequired
             }
@@ -180,7 +197,11 @@ impl DomainError {
             | DomainError::InvalidCredentialAlgorithm
             | DomainError::CredentialDecryptFailed
             | DomainError::UnsupportedCredentialVersion { .. }
-            | DomainError::TaskNotFound { .. } => ErrorSource::Local,
+            | DomainError::TaskNotFound { .. } 
+            | DomainError::BlankPermissionCode 
+            | DomainError::BlankRoleCode
+            | DomainError::BlankUserRoles
+            | DomainError::PermissionDenied => ErrorSource::Local,
             DomainError::Unauthorized { origin }
             | DomainError::TokenExpired { origin }
             | DomainError::RemoteTimeout { origin }
