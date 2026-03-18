@@ -18,65 +18,29 @@ use crate::domain::{
         user::SchoolUser,
     },
 };
+use crate::infrastructure::repository::{map_sqlx_err, PgRepositoryBase};
 
 use super::week_mapper::{parse_school_week, to_school_week};
 
 #[derive(Clone)]
 pub struct PgSchoolRepository {
-    pool: PgPool,
+    base: PgRepositoryBase,
 }
 
 impl PgSchoolRepository {
     pub async fn connect(database_url: &str) -> Result<Self, DomainError> {
-        let pool = PgPool::connect(database_url).await.map_err(map_sqlx_err)?;
-        Ok(Self { pool })
+        let base = PgRepositoryBase::connect(database_url).await?;
+        Ok(Self { base })
     }
 
     pub fn from_pool(pool: PgPool) -> Self {
-        Self { pool }
+        Self {
+            base: PgRepositoryBase::from_pool(pool),
+        }
     }
 
     pub fn pool(&self) -> &PgPool {
-        &self.pool
-    }
-}
-
-fn map_sqlx_err(err: sqlx::Error) -> DomainError {
-    match err {
-        sqlx::Error::PoolTimedOut
-        | sqlx::Error::PoolClosed
-        | sqlx::Error::Io(_)
-        | sqlx::Error::Tls(_)
-        | sqlx::Error::WorkerCrashed => DomainError::PersistenceUnavailable {
-            message: format!("PostgreSQL 不可用: {err}"),
-        },
-        sqlx::Error::RowNotFound => DomainError::PersistenceCorrupted {
-            message: "在非预期上下文中未找到记录".to_string(),
-        },
-        sqlx::Error::Database(db_err) => {
-            if let Some(code) = db_err.code() {
-                match code.as_ref() {
-                    // serialization_failure / deadlock_detected / lock_not_available
-                    "40001" | "40P01" | "55P03" => DomainError::PersistenceConflict {
-                        message: format!("PostgreSQL 并发冲突({code}): {}", db_err.message()),
-                    },
-                    // unique_violation / exclusion_violation
-                    "23505" | "23P01" => DomainError::PersistenceConflict {
-                        message: format!("PostgreSQL 约束冲突({code}): {}", db_err.message()),
-                    },
-                    _ => DomainError::PersistenceCorrupted {
-                        message: format!("PostgreSQL 数据库错误({code}): {}", db_err.message()),
-                    },
-                }
-            } else {
-                DomainError::PersistenceCorrupted {
-                    message: format!("PostgreSQL 数据库错误: {}", db_err.message()),
-                }
-            }
-        }
-        other => DomainError::PersistenceCorrupted {
-            message: format!("PostgreSQL 未预期错误: {other}"),
-        },
+        self.base.pool()
     }
 }
 
@@ -174,7 +138,7 @@ impl SchoolUserRepository for PgSchoolRepository {
         )
         .bind(student_id)
         .bind(owner_user_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.pool())
         .await
         .map_err(map_sqlx_err)?;
 
@@ -194,7 +158,7 @@ impl SchoolUserRepository for PgSchoolRepository {
             "#,
         )
         .bind(owner_user_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.pool())
         .await
         .map_err(map_sqlx_err)?;
 
@@ -217,7 +181,7 @@ impl SchoolUserRepository for PgSchoolRepository {
         .bind(user.owner_user_id())
         .bind(user.user_name())
         .bind(user.credential_storage())
-        .execute(&self.pool)
+        .execute(self.pool())
         .await
         .map_err(map_sqlx_err)?;
         Ok(())
@@ -233,7 +197,7 @@ impl SchoolUserRepository for PgSchoolRepository {
         )
             .bind(owner_user_id)
             .bind(student_id)
-            .execute(&self.pool)
+            .execute(self.pool())
             .await
             .map_err(map_sqlx_err)?
             .rows_affected();
@@ -256,7 +220,7 @@ impl SchoolSignConfigRepository for PgSchoolRepository {
         )
         .bind(student_id)
         .bind(school_task_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.pool())
         .await
         .map_err(map_sqlx_err)?;
 
@@ -276,7 +240,7 @@ impl SchoolSignConfigRepository for PgSchoolRepository {
         )
         .bind(student_id)
         .bind(school_task_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.pool())
         .await
         .map_err(map_sqlx_err)?;
 
@@ -291,7 +255,7 @@ impl SchoolSignConfigRepository for PgSchoolRepository {
             "SELECT * FROM school_sign_configs WHERE student_id = $1 ORDER BY school_task_id",
         )
         .bind(student_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.pool())
         .await
         .map_err(map_sqlx_err)?;
         rows.iter().map(map_row_to_sign_config).collect()
@@ -305,7 +269,7 @@ impl SchoolSignConfigRepository for PgSchoolRepository {
             "SELECT * FROM school_sign_configs WHERE student_id = $1 AND enable = TRUE ORDER BY school_task_id",
         )
         .bind(student_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.pool())
         .await
         .map_err(map_sqlx_err)?;
         rows.iter().map(map_row_to_sign_config).collect()
@@ -358,7 +322,7 @@ impl SchoolSignConfigRepository for PgSchoolRepository {
         .bind(config.allow_sign_timerange_start)
         .bind(config.allow_sign_timerange_end)
         .bind(config.enable)
-        .execute(&self.pool)
+        .execute(self.pool())
         .await
         .map_err(map_sqlx_err)?;
         Ok(())
@@ -374,7 +338,7 @@ impl SchoolSignConfigRepository for PgSchoolRepository {
         )
         .bind(student_id)
         .bind(school_task_id)
-        .execute(&self.pool)
+        .execute(self.pool())
         .await
         .map_err(map_sqlx_err)?
         .rows_affected();
@@ -397,7 +361,7 @@ impl SchoolSignConfigRepository for PgSchoolRepository {
         .bind(student_id)
         .bind(school_task_id)
         .bind(enabled)
-        .execute(&self.pool)
+        .execute(self.pool())
         .await
         .map_err(map_sqlx_err)?
         .rows_affected();
@@ -417,7 +381,7 @@ impl SchoolSignTaskRepository for PgSchoolRepository {
         )
         .bind(student_id)
         .bind(school_task_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.pool())
         .await
         .map_err(map_sqlx_err)?;
         row.map(|r| map_row_to_sign_task(&r)).transpose()
@@ -454,7 +418,7 @@ impl SchoolSignTaskRepository for PgSchoolRepository {
         )
         .bind(student_id)
         .bind(utc_now)
-        .fetch_all(&self.pool)
+        .fetch_all(self.pool())
         .await
         .map_err(map_sqlx_err)?;
 
@@ -475,7 +439,7 @@ impl SchoolSignTaskRepository for PgSchoolRepository {
             "SELECT * FROM school_sign_tasks WHERE student_id = $1 ORDER BY school_task_id",
         )
         .bind(student_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.pool())
         .await
         .map_err(map_sqlx_err)?;
         rows.iter().map(map_row_to_sign_task).collect()
@@ -517,7 +481,7 @@ impl SchoolSignTaskRepository for PgSchoolRepository {
         .bind(sign_task.daily_time_window().end())
         .bind(weekdays_to_storage(sign_task.days_of_week()))
         .bind(sign_task.time_zone().name())
-        .execute(&self.pool)
+        .execute(self.pool())
         .await
         .map_err(map_sqlx_err)?;
         Ok(())
@@ -533,7 +497,7 @@ impl SchoolSignTaskRepository for PgSchoolRepository {
         )
         .bind(student_id)
         .bind(school_task_id)
-        .execute(&self.pool)
+        .execute(self.pool())
         .await
         .map_err(map_sqlx_err)?
         .rows_affected();
@@ -553,7 +517,7 @@ impl SchoolSessionRepository for PgSchoolRepository {
         )
         .bind(owner_user_id)
         .bind(student_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(self.pool())
         .await
         .map_err(map_sqlx_err)?;
 
@@ -579,7 +543,7 @@ impl SchoolSessionRepository for PgSchoolRepository {
         .bind(session.access_token())
         .bind(session.refresh_token())
         .bind(session.expired_at())
-        .execute(&self.pool)
+        .execute(self.pool())
         .await
         .map_err(map_sqlx_err)?;
         Ok(())
@@ -594,7 +558,7 @@ impl SchoolSessionRepository for PgSchoolRepository {
             sqlx::query("DELETE FROM school_sessions WHERE owner_user_id = $1 AND student_id = $2")
                 .bind(owner_user_id)
                 .bind(student_id)
-                .execute(&self.pool)
+                .execute(self.pool())
                 .await
                 .map_err(map_sqlx_err)?
                 .rows_affected();
@@ -628,7 +592,7 @@ impl SchoolUserCustomUserAgentRepository for PgSchoolRepository {
         .bind(owner_user_id)
         .bind(student_id)
         .bind(ua)
-        .execute(&self.pool)
+        .execute(self.pool())
         .await
         .map_err(map_sqlx_err)?;
 
@@ -650,7 +614,7 @@ impl SchoolUserCustomUserAgentRepository for PgSchoolRepository {
         .bind(owner_user_id)
         .bind(student_id)
         .bind(user_agent)
-        .execute(&self.pool)
+        .execute(self.pool())
         .await
         .map_err(map_sqlx_err)?
         .rows_affected();
@@ -673,7 +637,7 @@ impl SchoolUserCustomUserAgentRepository for PgSchoolRepository {
         )
         .bind(owner_user_id)
         .bind(student_id)
-        .fetch_all(&self.pool)
+        .fetch_all(self.pool())
         .await
         .map_err(map_sqlx_err)?;
 
