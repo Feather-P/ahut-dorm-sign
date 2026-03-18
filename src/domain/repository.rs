@@ -15,6 +15,14 @@ pub trait UserRepository: Send + Sync {
 
 }
 
+/// 角色目录
+#[async_trait]
+pub trait RoleCatalogRepository: Send + Sync {
+    async fn list_all_roles(&self) -> Result<Vec<RoleCode>, DomainError>;
+    async fn role_exists(&self, role: &RoleCode) -> Result<bool, DomainError>;
+}
+
+
 /// 用户-角色绑定
 #[async_trait]
 pub trait UserRoleBindingRepository: Send + Sync {
@@ -31,11 +39,4 @@ pub trait RolePermissionRepository: Send + Sync {
     async fn grant_permission(&self, role: RoleCode, permission: PermissionCode) -> Result<(), DomainError>;
     async fn revoke_permission(&self, role: RoleCode, permission: PermissionCode) -> Result<(), DomainError>;
     async fn replace_permissions(&self, role: RoleCode, permissions: Vec<PermissionCode>) -> Result<(), DomainError>;
-}
-
-/// 角色目录
-#[async_trait]
-pub trait RoleCatalogRepository: Send + Sync {
-    async fn list_all_roles(&self) -> Result<Vec<RoleCode>, DomainError>;
-    async fn role_exists(&self, role: &RoleCode) -> Result<bool, DomainError>;
 }

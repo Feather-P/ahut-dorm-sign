@@ -184,33 +184,11 @@ impl RolePermissions {
 }
 
 #[derive(Debug, Clone)]
-pub struct AuthContext {
-    _reserved: BTreeSet<uuid::Uuid>,
-}
-
-impl AuthContext {
-    pub fn empty() -> Self {
-        Self {
-            _reserved: BTreeSet::new(),
-        }
-    }
-
-    pub fn new_reserved(ids: BTreeSet<uuid::Uuid>) -> Self {
-        Self { _reserved: ids }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub enum ResourceRef {
-    Task {
-        owner_user_id: Option<uuid::Uuid>,
-    },
-    Session {
-        owner_user_id: Option<uuid::Uuid>,
-    },
-    User {
-        target_user_id: uuid::Uuid,
-    },
+    Task { owner_user_id: Option<uuid::Uuid> },
+    Session { owner_user_id: Option<uuid::Uuid> },
+    SchoolUser { owner_user_id: Option<uuid::Uuid> },
+    User { target_user_id: uuid::Uuid },
     Admin,
 }
 
@@ -237,10 +215,9 @@ impl AccessRequest {
 pub struct AccessPolicy;
 
 impl AccessPolicy {
-    pub fn can_with_context(
+    pub fn can(
         user: &SystemUser,
         req: &AccessRequest,
-        auth_ctx: &AuthContext,
         role_permissions: &RolePermissions,
         user_role_bindings: &UserRoleBindings,
     ) -> bool {
@@ -256,7 +233,7 @@ impl AccessPolicy {
             .any(|p| {
                 p.parts().is_some_and(|grant| {
                     Self::permission_implies(grant, needed)
-                        && Self::scope_constraint_allows(user, req, auth_ctx)
+                        && Self::scope_constraint_allows(user, req)
                 })
             })
     }
@@ -264,11 +241,10 @@ impl AccessPolicy {
     pub fn enforce(
         user: &SystemUser,
         req: &AccessRequest,
-        auth_ctx: &AuthContext,
         role_permissions: &RolePermissions,
         user_role_bindings: &UserRoleBindings,
     ) -> Result<(), DomainError> {
-        if Self::can_with_context(user, req, auth_ctx, role_permissions, user_role_bindings) {
+        if Self::can(user, req, role_permissions, user_role_bindings) {
             Ok(())
         } else {
             Err(DomainError::PermissionDenied)
@@ -277,7 +253,8 @@ impl AccessPolicy {
 
     fn permission_implies(grant: PermissionParts<'_>, need: PermissionParts<'_>) -> bool {
         let resource_match = grant.resource == need.resource || grant.resource == "*";
-        let action_match = grant.action == need.action || grant.action == "manage" || grant.action == "*";
+        let action_match =
+            grant.action == need.action || grant.action == "manage" || grant.action == "*";
         let scope_match = match (grant.scope, need.scope) {
             ("*", _) => true,
             ("global", "global") => true,
@@ -287,7 +264,7 @@ impl AccessPolicy {
         resource_match && action_match && scope_match
     }
 
-    fn scope_constraint_allows(user: &SystemUser, req: &AccessRequest, _auth_ctx: &AuthContext) -> bool {
+    fn scope_constraint_allows(user: &SystemUser, req: &AccessRequest) -> bool {
         let needed = match req.need().parts() {
             Some(parts) => parts,
             None => return false,
@@ -296,8 +273,15 @@ impl AccessPolicy {
         match needed.scope {
             "global" | "*" => true,
             "own" => match req.resource() {
-                ResourceRef::Task { owner_user_id } => owner_user_id.is_some_and(|id| id == user.id()),
-                ResourceRef::Session { owner_user_id } => owner_user_id.is_some_and(|id| id == user.id()),
+                ResourceRef::Task { owner_user_id } => {
+                    owner_user_id.is_some_and(|id| id == user.id())
+                }
+                ResourceRef::Session { owner_user_id } => {
+                    owner_user_id.is_some_and(|id| id == user.id())
+                }
+                ResourceRef::SchoolUser { owner_user_id } => {
+                    owner_user_id.is_some_and(|id| id == user.id())
+                }
                 ResourceRef::User { target_user_id } => *target_user_id == user.id(),
                 ResourceRef::Admin => false,
             },
