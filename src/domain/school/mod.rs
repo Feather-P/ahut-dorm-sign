@@ -1,4 +1,5 @@
 pub mod credential;
+pub mod checkin_flow;
 pub mod crypto;
 pub mod gateway;
 pub mod location;
@@ -11,3 +12,4 @@ pub mod sign_config;
 pub mod task;
 pub mod token;
 pub mod user;
+pub mod task_run;

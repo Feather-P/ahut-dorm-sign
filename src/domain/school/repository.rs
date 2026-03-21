@@ -5,6 +5,7 @@ use crate::domain::{
     error::DomainError,
     school::{
         session::SchoolSession, sign_config::SchoolSignConfig, task::SchoolSignTask,
+        task_run::{RunState, SchoolSignRun},
         user::SchoolUser,
     },
 };
@@ -97,6 +98,40 @@ pub trait SchoolSignTaskRepository: Send + Sync {
         &self,
         student_id: &str,
         school_task_id: &str,
+    ) -> SchoolRepositoryResult<bool>;
+}
+
+#[async_trait]
+pub trait SchoolSignRunRepository: Send + Sync {
+    async fn save(&self, run: SchoolSignRun) -> SchoolRepositoryResult<()>;
+
+    async fn find_by_id(&self, run_id: uuid::Uuid) -> SchoolRepositoryResult<Option<SchoolSignRun>>;
+
+    async fn find_by_task_and_date(
+        &self,
+        task_id: uuid::Uuid,
+        biz_date: chrono::NaiveDate,
+    ) -> SchoolRepositoryResult<Option<SchoolSignRun>>;
+
+    async fn list_due_waiting(
+        &self,
+        utc_now: DateTime<Utc>,
+        limit: u32,
+    ) -> SchoolRepositoryResult<Vec<SchoolSignRun>>;
+
+    async fn list_stale_running(
+        &self,
+        running_before_utc: DateTime<Utc>,
+        limit: u32,
+    ) -> SchoolRepositoryResult<Vec<SchoolSignRun>>;
+
+    /// CAS 状态迁移: 仅当当前状态等于 expected_state 时更新为 new_state。
+    async fn compare_and_set_state(
+        &self,
+        run_id: uuid::Uuid,
+        expected_state: RunState,
+        new_state: RunState,
+        utc_now: DateTime<Utc>,
     ) -> SchoolRepositoryResult<bool>;
 }
 

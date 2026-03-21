@@ -125,6 +125,9 @@ pub enum DomainError {
 
     #[error("无权限执行该操作")]
     PermissionDenied,
+
+    #[error("无效的状态迁移")]
+    InvalidStateTransition,
 }
 
 impl DomainError {
@@ -155,7 +158,8 @@ impl DomainError {
             | DomainError::BlankPermissionCode 
             | DomainError::BlankRoleCode
             | DomainError::BlankUserRoles
-            | DomainError::PermissionDenied => ErrorKind::Terminal,
+            | DomainError::PermissionDenied
+            | DomainError::InvalidStateTransition => ErrorKind::Terminal,
             DomainError::Unauthorized { .. } | DomainError::TokenExpired { .. } => {
                 ErrorKind::ReauthRequired
             }
@@ -201,7 +205,8 @@ impl DomainError {
             | DomainError::BlankPermissionCode 
             | DomainError::BlankRoleCode
             | DomainError::BlankUserRoles
-            | DomainError::PermissionDenied => ErrorSource::Local,
+            | DomainError::PermissionDenied
+            | DomainError::InvalidStateTransition => ErrorSource::Local,
             DomainError::Unauthorized { origin }
             | DomainError::TokenExpired { origin }
             | DomainError::RemoteTimeout { origin }
